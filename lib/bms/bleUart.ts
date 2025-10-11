@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // cspell:words Uart NUS FFF0 FFF1 FFF2 dcca9e
 // BLE UART auto-detection for Daly-like modules via @abandonware/noble.
 // Lazy-load noble to avoid bundler resolving optional native deps at build time.
@@ -129,7 +130,7 @@ async function discoverUart(peripheral: any) {
     const c2 = characteristics.find(
       (c: any) => c.uuid === UUIDS.FFF2 || c.uuid === platformUuid(UUIDS.FFF2)
     );
-    let notifyChar: any, writeChar: any;
+    let notifyChar, writeChar;
     for (const c of [c1, c2]) {
       if (!c) continue;
       if (!notifyChar && c.properties.includes("notify")) notifyChar = c;
@@ -173,18 +174,20 @@ async function discoverUart(peripheral: any) {
 
 async function waitForPoweredOn() {
   const noble = await getNoble();
-  if (noble.state === "poweredOn") return;
+  // Work around inaccurate typings: runtime exposes "state", d.ts exposes "_state"
+  const currentState = (noble)._state ?? (noble)._state;
+  if (currentState === "poweredOn") return;
   await new Promise<void>((resolve, reject) => {
     const onState = (state: string) => {
       if (state === "poweredOn") {
-        noble.removeListener("stateChange", onState as any);
+        noble.removeListener("stateChange", onState);
         resolve();
       } else if (state === "unauthorized" || state === "unsupported") {
-        noble.removeListener("stateChange", onState as any);
+        noble.removeListener("stateChange", onState);
         reject(new Error(`Bluetooth state: ${state}`));
       }
     };
-    noble.on("stateChange", onState as any);
+    noble.on("stateChange", onState);
   });
 }
 
