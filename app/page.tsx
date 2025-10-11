@@ -254,7 +254,6 @@ export default function Page() {
               <YAxis
                 yAxisId="soc"
                 orientation="right"
-                yAxisIdOffset={60}
                 domain={[0, 100]}
                 tickFormatter={(v) => `${v}%`}
               />
