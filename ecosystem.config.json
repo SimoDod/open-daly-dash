@@ -1,0 +1,10 @@
+{
+  "apps": [
+    {
+      "name": "open-daly-dash",
+      "script": "next",
+      "args": "start -p 8084",
+      "exec_mode": "fork"
+    }
+  ]
+}

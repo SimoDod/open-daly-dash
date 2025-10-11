@@ -1,7 +1,33 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  reactStrictMode: true,
+  experimental: {
+    // Let these load via Node at runtime instead of bundling
+    serverComponentsExternalPackages: [
+      "@abandonware/noble",
+      "@abandonware/bluetooth-hci-socket",
+      "noble-mac",
+      "xpc-connection",
+      "bluetooth-hci-socket",
+    ],
+    serverActions: {
+      allowedOrigins: ["*"],
+    },
+  },
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      // Mark platform-specific native modules as external CommonJS so webpack doesn't try to resolve/bundle them
+      config.externals.push({
+        "@abandonware/bluetooth-hci-socket":
+          "commonjs @abandonware/bluetooth-hci-socket",
+        "bluetooth-hci-socket": "commonjs bluetooth-hci-socket",
+        "noble-mac": "commonjs noble-mac",
+        "xpc-connection": "commonjs xpc-connection",
+      });
+    }
+    return config;
+  },
 };
 
 export default nextConfig;
