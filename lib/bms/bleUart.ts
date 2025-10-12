@@ -19,15 +19,44 @@ export interface BleUartConnection {
 }
 
 type Noble = typeof import("@abandonware/noble");
+
 // Lazy-load bluetooth-hci-socket and attach to global to satisfy noble on Linux
 let hciLoaded = false;
 async function ensureHciSocketLoaded() {
   if (hciLoaded) return;
+  hciLoaded = true; // prevent repeated attempts/log spam
+
+  const isNode =
+    typeof process !== "undefined" && !!(process as any).versions?.node;
+  if (!isNode) return; // browser/edge runtimes cannot load native modules
+
+  if (process.platform !== "linux") return; // macOS/Windows don't need HCI socket
+
+  const g: any = globalThis as any;
+  if (g.BluetoothHciSocket) return;
+
   try {
-    const m: any = await import("@abandonware/bluetooth-hci-socket");
-    (global as any).BluetoothHciSocket = m?.default || m;
-  } catch {}
-  hciLoaded = true;
+    const { createRequire } = await import("module");
+    const req = createRequire(import.meta.url);
+
+    let mod: any;
+    try {
+      mod = req("@abandonware/bluetooth-hci-socket");
+    } catch {
+      // Fallback to legacy name if abandonware fork isn't installed
+      mod = req("bluetooth-hci-socket");
+    }
+    g.BluetoothHciSocket = mod?.default || mod;
+  } catch (err) {
+    // Don't throw; noble will report 'unsupported' later. Just warn clearly.
+    // This avoids bundlers failing on native module resolution paths.
+    // To fix on Linux: ensure @abandonware/bluetooth-hci-socket is installed and built
+    // (node-gyp), or run in a Node environment where native modules are available.
+    console.warn(
+      "BLE: Failed to load @abandonware/bluetooth-hci-socket; BLE may not work on Linux.",
+      err
+    );
+  }
 }
 
 // Defer loading noble until runtime
@@ -35,9 +64,18 @@ let nobleMod: Noble | null = null;
 async function getNoble(): Promise<Noble> {
   if (nobleMod) return nobleMod;
   await ensureHciSocketLoaded();
-  // Support both default and CJS export shapes
-  const m: any = await import("@abandonware/noble");
-  nobleMod = (m?.default || m) as Noble;
+
+  // Try ESM dynamic import first, then fall back to CJS require via createRequire
+  try {
+    const m: any = await import("@abandonware/noble");
+    nobleMod = (m?.default || m) as Noble;
+  } catch {
+    const { createRequire } = await import("module");
+    const req = createRequire(import.meta.url);
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const m = req("@abandonware/noble");
+    nobleMod = ((m as any)?.default || m) as Noble;
+  }
   return nobleMod!;
 }
 
@@ -185,20 +223,20 @@ async function discoverUart(peripheral: any) {
 
 async function waitForPoweredOn() {
   const noble = await getNoble();
-  // Work around inaccurate typings: runtime exposes "state", d.ts exposes "_state"
-  const currentState = noble._state ?? noble._state;
+  // Runtime exposes "state"
+  const currentState = (noble as any).state ?? (noble as any)._state;
   if (currentState === "poweredOn") return;
   await new Promise<void>((resolve, reject) => {
     const onState = (state: string) => {
       if (state === "poweredOn") {
-        noble.removeListener("stateChange", onState);
+        (noble as any).removeListener("stateChange", onState);
         resolve();
       } else if (state === "unauthorized" || state === "unsupported") {
-        noble.removeListener("stateChange", onState);
+        (noble as any).removeListener("stateChange", onState);
         reject(new Error(`Bluetooth state: ${state}`));
       }
     };
-    noble.on("stateChange", onState);
+    (noble as any).on("stateChange", onState);
   });
 }
 
@@ -212,17 +250,9 @@ export async function connectBleUart({
   const noble = await getNoble();
 
   await waitForPoweredOn();
-  await noble.startScanningAsync([], true);
+  await (noble as any).startScanningAsync([], true);
 
   const periph = await new Promise<any>((resolve, reject) => {
-    const timer = setTimeout(() => {
-      noble.removeListener("discover", onDiscover as any);
-      reject(
-        new Error(
-          "Target not found while scanning. Check ADDR/NAME and device advertising."
-        )
-      );
-    }, 30000);
     const onDiscover = (p: any) => {
       if (
         matchesTarget(p, {
@@ -231,14 +261,22 @@ export async function connectBleUart({
         })
       ) {
         clearTimeout(timer);
-        noble.removeListener("discover", onDiscover as any);
+        (noble as any).removeListener("discover", onDiscover as any);
         resolve(p);
       }
     };
-    noble.on("discover", onDiscover as any);
+    const timer = setTimeout(() => {
+      (noble as any).removeListener("discover", onDiscover as any);
+      reject(
+        new Error(
+          "Target not found while scanning. Check ADDR/NAME and device advertising."
+        )
+      );
+    }, 30000);
+    (noble as any).on("discover", onDiscover as any);
   }).finally(async () => {
     try {
-      await noble.stopScanningAsync();
+      await (noble as any).stopScanningAsync();
     } catch {}
   });
 
