@@ -72,7 +72,6 @@ async function getNoble(): Promise<Noble> {
   } catch {
     const { createRequire } = await import("module");
     const req = createRequire(import.meta.url);
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const m = req("@abandonware/noble");
     nobleMod = ((m as any)?.default || m) as Noble;
   }
