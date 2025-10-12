@@ -4,11 +4,14 @@ export const dynamic = "force-dynamic";
 import { NextRequest } from "next/server";
 import { getBmsSampleModel } from "@/lib/db/mongoose";
 
-const DASH_PASS = process.env.DASH_PASS || "1234";
+const DASH_PASS = process.env.DASH_PASS;
 
 function isAuthed(req: NextRequest) {
   const pass =
     req.nextUrl.searchParams.get("pass") || req.headers.get("x-pass");
+
+  console.log({ pass: req.headers.get("x-pass") });
+
   return pass && pass === DASH_PASS;
 }
 

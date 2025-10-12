@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest } from "next/server";
 import { getBmsService } from "@/lib/bms/service";
 
-const DASH_PASS = process.env.DASH_PASS || "1234";
+const DASH_PASS = process.env.DASH_PASS;
 
 function isAuthed(req: NextRequest) {
   const pass =

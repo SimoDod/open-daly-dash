@@ -78,7 +78,13 @@ const MAX_POINTS = 600;
 const FLUSH_MS = 350;
 
 export default function Page() {
-  const [pass, setPass] = useState<string>("");
+  const [pass, setPass] = useState<string>(() => {
+    try {
+      return localStorage.getItem("dash_pass") || "";
+    } catch {
+      return "";
+    }
+  });
   const [connected, setConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [paused, setPaused] = useState(false);
@@ -97,18 +103,23 @@ export default function Page() {
   const [showSoc, setShowSoc] = useState(true);
 
   useEffect(() => {
-    const saved = localStorage.getItem("dash_pass") || "";
-    setPass(saved);
-  }, []);
+    try {
+      if (pass) localStorage.setItem("dash_pass", pass);
+      else localStorage.removeItem("dash_pass");
+    } catch {
+      // ignore
+    }
+  }, [pass]);
 
   useEffect(() => {
-    if (pass !== null) loadHistory("24h");
+    if (!pass) return;
+    loadHistory("24h");
     return () => {
       evtRef.current?.close();
       if (flushTimerRef.current) clearTimeout(flushTimerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [pass]);
 
   const scheduleFlush = () => {
     if (flushTimerRef.current) return;
@@ -175,6 +186,11 @@ export default function Page() {
       setConnected(false);
     };
   };
+
+  useEffect(() => {
+    connect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const disconnect = () => {
     evtRef.current?.close();
@@ -404,13 +420,30 @@ export default function Page() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatCard
-                  icon={<Zap />}
-                  label="Voltage"
-                  value={fmt(snapshot?.voltage_V, "V")}
+                <BatteryCard
+                  label="State of Charge"
+                  value={snapshot?.soc_pct ?? null}
                   hint={
-                    snapshot?.packFromCells_V
-                      ? `Cells sum: ${fmt(snapshot.packFromCells_V, "V")}`
+                    snapshot?.remainCapacity_Ah
+                      ? `Remain ${snapshot.remainCapacity_Ah} Ah`
+                      : undefined
+                  }
+                />
+
+                <StatCard
+                  icon={<PlugZap />}
+                  label="Power"
+                  value={fmt(
+                    snapshot?.voltage_V != null && snapshot?.current_A != null
+                      ? snapshot.voltage_V * snapshot.current_A
+                      : undefined,
+                    "W"
+                  )}
+                  hint={
+                    snapshot?.voltage_V != null && snapshot?.current_A != null
+                      ? `${fmt(snapshot.voltage_V)} × ${fmt(
+                          snapshot.current_A
+                        )}`
                       : undefined
                   }
                 />
@@ -426,12 +459,13 @@ export default function Page() {
                   }
                 />
 
-                <BatteryCard
-                  label="State of Charge"
-                  value={snapshot?.soc_pct ?? null}
+                <StatCard
+                  icon={<Zap />}
+                  label="Voltage"
+                  value={fmt(snapshot?.voltage_V, "V")}
                   hint={
-                    snapshot?.remainCapacity_Ah
-                      ? `Remain ${snapshot.remainCapacity_Ah} Ah`
+                    snapshot?.packFromCells_V
+                      ? `Cells sum: ${fmt(snapshot.packFromCells_V, "V")}`
                       : undefined
                   }
                 />
@@ -616,7 +650,7 @@ export default function Page() {
               </div>
             </CardHeader>
 
-            <CardContent>{combinedChart}</CardContent>
+            <CardContent className="px-0">{combinedChart}</CardContent>
           </Card>
 
           <Card>
