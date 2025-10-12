@@ -7,6 +7,15 @@ const nextConfig: NextConfig = {
       allowedOrigins: ["*"],
     },
   },
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals = [
+        ...(config.externals || []),
+        "@abandonware/bluetooth-hci-socket",
+      ];
+    }
+    return config;
+  },
 };
 
 export default nextConfig;
