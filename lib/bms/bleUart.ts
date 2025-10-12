@@ -19,11 +19,22 @@ export interface BleUartConnection {
 }
 
 type Noble = typeof import("@abandonware/noble");
+// Lazy-load bluetooth-hci-socket and attach to global to satisfy noble on Linux
+let hciLoaded = false;
+async function ensureHciSocketLoaded() {
+  if (hciLoaded) return;
+  try {
+    const m: any = await import("@abandonware/bluetooth-hci-socket");
+    (global as any).BluetoothHciSocket = m?.default || m;
+  } catch {}
+  hciLoaded = true;
+}
 
 // Defer loading noble until runtime
 let nobleMod: Noble | null = null;
 async function getNoble(): Promise<Noble> {
   if (nobleMod) return nobleMod;
+  await ensureHciSocketLoaded();
   // Support both default and CJS export shapes
   const m: any = await import("@abandonware/noble");
   nobleMod = (m?.default || m) as Noble;
@@ -175,7 +186,7 @@ async function discoverUart(peripheral: any) {
 async function waitForPoweredOn() {
   const noble = await getNoble();
   // Work around inaccurate typings: runtime exposes "state", d.ts exposes "_state"
-  const currentState = (noble)._state ?? (noble)._state;
+  const currentState = noble._state ?? noble._state;
   if (currentState === "poweredOn") return;
   await new Promise<void>((resolve, reject) => {
     const onState = (state: string) => {

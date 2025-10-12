@@ -11,6 +11,7 @@ const nextConfig: NextConfig = {
     if (isServer) {
       config.externals = [
         ...(config.externals || []),
+        "@abandonware/noble",
         "@abandonware/bluetooth-hci-socket",
       ];
     }
