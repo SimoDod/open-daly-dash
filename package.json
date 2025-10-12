@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "next dev --turbopack -p 8084",
     "build": "next build --turbopack",
     "start": "pm2 start ./ecosystem.config.json",
     "lint": "eslint"
