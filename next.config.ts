@@ -3,14 +3,6 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   experimental: {
-    // Let these load via Node at runtime instead of bundling
-    serverComponentsExternalPackages: [
-      "@abandonware/noble",
-      "@abandonware/bluetooth-hci-socket",
-      "noble-mac",
-      "xpc-connection",
-      "bluetooth-hci-socket",
-    ],
     serverActions: {
       allowedOrigins: ["*"],
     },
