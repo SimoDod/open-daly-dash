@@ -9,11 +9,13 @@ const nextConfig: NextConfig = {
   },
   webpack: (config, { isServer }) => {
     if (isServer) {
-      // Mark platform-specific native modules as external CommonJS so webpack doesn't try to resolve/bundle them
+      config.resolve.alias = {
+        ...(config.resolve.alias || {}),
+        "bluetooth-hci-socket": "@abandonware/bluetooth-hci-socket",
+      };
       config.externals.push({
         "@abandonware/bluetooth-hci-socket":
           "commonjs @abandonware/bluetooth-hci-socket",
-        "bluetooth-hci-socket": "commonjs bluetooth-hci-socket",
         "noble-mac": "commonjs noble-mac",
         "xpc-connection": "commonjs xpc-connection",
       });
