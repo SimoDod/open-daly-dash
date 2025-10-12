@@ -10,8 +10,6 @@ function isAuthed(req: NextRequest) {
   const pass =
     req.nextUrl.searchParams.get("pass") || req.headers.get("x-pass");
 
-  console.log({ pass: req.headers.get("x-pass") });
-
   return pass && pass === DASH_PASS;
 }
 
