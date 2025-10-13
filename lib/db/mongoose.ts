@@ -60,12 +60,9 @@ let BmsSampleModel: Model<BmsSampleDoc> | null = null;
 export async function getBmsSampleModel(): Promise<Model<BmsSampleDoc>> {
   await dbConnect();
   if (!BmsSampleModel) {
-    // Re-use existing model in dev
     BmsSampleModel =
       mongoose.models.BmsSample ||
       mongoose.model<BmsSampleDoc>("BmsSample", BmsSampleSchema);
-    // Do NOT call createIndexes() here to avoid duplicate ensure runs during hot reloads.
-    // Let Mongoose handle it once (autoIndex) or manage externally in prod.
   }
   return BmsSampleModel;
 }
