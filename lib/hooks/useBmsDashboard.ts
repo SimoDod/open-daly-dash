@@ -226,10 +226,13 @@ export function useBmsDashboard() {
     [pass]
   );
 
+  window.onload = () => {
+    connect();
+  };
+
   useEffect(() => {
     try {
       if (pass) {
-        connect();
         localStorage.setItem("dash_pass", pass);
       } else {
         localStorage.removeItem("dash_pass");
