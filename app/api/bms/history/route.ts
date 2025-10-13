@@ -27,10 +27,6 @@ export async function GET(req: NextRequest) {
   const u = req.nextUrl;
   const from = u.searchParams.get("from");
   const to = u.searchParams.get("to");
-  const limit = Math.min(
-    parseInt(u.searchParams.get("limit") || "1000", 10),
-    5000
-  );
 
   const q: { ts?: { $gte?: Date; $lte?: Date } } = {};
   if (from || to) q.ts = {};
@@ -46,7 +42,7 @@ export async function GET(req: NextRequest) {
   const Model = await getBmsSampleModel();
   const docs = await Model.find(q)
     .sort({ ts: 1 })
-    .limit(limit)
+    .limit(10000)
     .lean()
     .select({ _id: 0 })
     .exec();

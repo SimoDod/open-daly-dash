@@ -198,7 +198,7 @@ export function useBmsDashboard() {
       }
       const url = `/api/bms/history?from=${encodeURIComponent(
         from.toISOString()
-      )}&to=${encodeURIComponent(now.toISOString())}&limit=15000`;
+      )}&to=${encodeURIComponent(now.toISOString())}`;
       try {
         const res = await fetch(url, {
           headers: { "x-pass": pass },

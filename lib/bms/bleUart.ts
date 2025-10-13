@@ -43,15 +43,10 @@ async function ensureHciSocketLoaded() {
     try {
       mod = req("@abandonware/bluetooth-hci-socket");
     } catch {
-      // Fallback to legacy name if abandonware fork isn't installed
       mod = req("bluetooth-hci-socket");
     }
     g.BluetoothHciSocket = mod?.default || mod;
   } catch (err) {
-    // Don't throw; noble will report 'unsupported' later. Just warn clearly.
-    // This avoids bundlers failing on native module resolution paths.
-    // To fix on Linux: ensure @abandonware/bluetooth-hci-socket is installed and built
-    // (node-gyp), or run in a Node environment where native modules are available.
     console.warn(
       "BLE: Failed to load @abandonware/bluetooth-hci-socket; BLE may not work on Linux.",
       err
@@ -65,7 +60,6 @@ async function getNoble(): Promise<Noble> {
   if (nobleMod) return nobleMod;
   await ensureHciSocketLoaded();
 
-  // Try ESM dynamic import first, then fall back to CJS require via createRequire
   try {
     const m: any = await import("@abandonware/noble");
     nobleMod = (m?.default || m) as Noble;
