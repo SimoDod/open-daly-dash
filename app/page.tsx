@@ -216,7 +216,7 @@ export default function Page() {
                               ? "text-red-600"
                               : "text-gray-700";
                           return (
-                            <span className={color}>{fmt(power, "W")}</span>
+                            <span className={color}>{fmt(power, "W", 0)}</span>
                           );
                         })()
                       : "—"
