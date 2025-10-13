@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev --turbopack -p 8084",
     "build": "next build --turbopack",
+    "rebuild-hci": "npm rebuild @abandonware/bluetooth-hci-socket --build-from-source",
     "start": "pm2 start ./ecosystem.config.json",
     "lint": "eslint"
   },
