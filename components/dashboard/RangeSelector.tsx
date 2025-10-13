@@ -27,7 +27,6 @@ export function RangeSelector({
       {btn("6h", "6h")}
       {btn("24h", "24h")}
       {btn("1w", "1w")}
-      {btn("1m", "1m")}
     </div>
   );
 }

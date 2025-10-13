@@ -20,4 +20,4 @@ export type DeviceInfo = {
 
 export type Point = { ts: string; v?: number; i?: number; soc?: number };
 
-export type RangeKey = "1h" | "6h" | "24h" | "1w" | "1m";
+export type RangeKey = "1h" | "6h" | "24h" | "1w";

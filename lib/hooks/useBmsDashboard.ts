@@ -190,9 +190,6 @@ export function useBmsDashboard() {
         case "1w":
           from = new Date(now.getTime() - 7 * 24 * 3600e3);
           break;
-        case "1m":
-          from = new Date(now.getTime() - 30 * 24 * 3600e3);
-          break;
         default:
           from = new Date(now.getTime() - 24 * 3600e3);
       }
