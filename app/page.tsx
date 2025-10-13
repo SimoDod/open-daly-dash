@@ -55,7 +55,6 @@ export default function Page() {
     cellDelta,
   } = useBmsDashboard();
 
-  // local resilient chart state: fetch history and subscribe to SSE so chart works even when user is not connected
   const [localChartData, setLocalChartData] = React.useState<any[]>(
     Array.isArray(chartData) ? chartData : []
   );
@@ -64,7 +63,6 @@ export default function Page() {
     latestChartRef.current = localChartData;
   }, [localChartData]);
 
-  // Sync when upstream chartData changes (from hook)
   React.useEffect(() => {
     if (Array.isArray(chartData) && chartData.length)
       setLocalChartData(chartData);
@@ -76,7 +74,7 @@ export default function Page() {
     async function fetchHistory() {
       try {
         const res = await fetch(
-          `/api/samples?limit=2000&pass=${encodeURIComponent(pass || "")}`
+          `/api/bms/samples?limit=2000&pass=${encodeURIComponent(pass || "")}`
         );
         if (!mounted) return;
         if (!res.ok) return;
@@ -84,15 +82,13 @@ export default function Page() {
         if (j?.data && Array.isArray(j.data)) {
           setLocalChartData(j.data);
         }
-      } catch (e) {
-        // ignore
-      }
+      } catch {}
     }
 
     let es: EventSource | null = null;
     try {
       es = new EventSource(
-        `/api/events?pass=${encodeURIComponent(pass || "")}`
+        `/api/bms/events?pass=${encodeURIComponent(pass || "")}`
       );
       es.addEventListener("message", (ev) => {
         try {
