@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,8 @@ export async function GET(req: NextRequest) {
   const svc = getBmsService();
   await svc.ensureStarted();
 
+  const debug = req.nextUrl.searchParams.get("debug") === "1";
+
   const stream = new ReadableStream({
     start(controller) {
       const write = (obj: BmsEvent) => {
@@ -35,19 +38,47 @@ export async function GET(req: NextRequest) {
       // initial hello
       write({ ts: new Date().toISOString(), event: "hello" });
 
-      // send last known state
-      const snapshot = svc.getLastSnapshot();
-      if (snapshot)
-        write({ ts: new Date().toISOString(), event: "state", snapshot });
+      // seed current status
+      const isConnected = (svc as any).getIsConnected?.() ?? false;
+      const isReady = (svc as any).getIsReady?.() ?? false;
+      write({
+        ts: new Date().toISOString(),
+        event: isConnected
+          ? isReady
+            ? "ready"
+            : "connected"
+          : ("disconnected" as any),
+      });
+
+      // send last known state if any
+      const snapshot = (svc as any).getLastSnapshot?.();
+      if (snapshot) {
+        write({
+          ts: new Date().toISOString(),
+          event: "state",
+          snapshot,
+        } as any);
+      }
 
       const onEvt = (evt: BmsEvent) => {
-        // Only pass state updates and a few key events downstream
-        if (evt?.event === "state" || evt?.event === "connected") {
+        if (debug) {
+          write(evt);
+          return;
+        }
+        // Forward key events downstream for UI
+        if (
+          evt?.event === "state" ||
+          evt?.event === "connected" ||
+          evt?.event === "ready" ||
+          evt?.event === "no_data" ||
+          evt?.event === "disconnected" ||
+          evt?.event === "tx_error"
+        ) {
           write(evt);
         }
       };
 
-      // keepalive pings
+      // keepalive pings (some proxies need no-transform to avoid buffering)
       const ping = setInterval(
         () => controller.enqueue(`: keepalive\n\n`),
         15000
@@ -72,7 +103,6 @@ export async function GET(req: NextRequest) {
         controller.close();
       };
 
-      // Close on client disconnect (Next handles this automatically); still implement for safety
       req.signal?.addEventListener?.("abort", close);
     },
   });
@@ -80,9 +110,11 @@ export async function GET(req: NextRequest) {
   return new Response(stream, {
     headers: {
       "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
+      "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
       "Access-Control-Allow-Origin": "*",
+      // Helpful with some proxies that buffer
+      "X-Accel-Buffering": "no",
     },
   });
 }
