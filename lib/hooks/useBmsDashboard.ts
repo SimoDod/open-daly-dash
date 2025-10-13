@@ -30,6 +30,7 @@ export function useBmsDashboard() {
   const [connecting, setConnecting] = useState(false);
   const [status, setStatus] = useState<Status>("idle");
   const [lastError, setLastError] = useState<string | null>(null);
+  const [tryToConnectOnce, setTryToConnectOnce] = useState<boolean>(true);
 
   const [paused, setPaused] = useState(false);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
@@ -226,19 +227,19 @@ export function useBmsDashboard() {
     [pass]
   );
 
-  window.onload = () => {
-    connect();
-  };
-
   useEffect(() => {
     try {
       if (pass) {
+        if (tryToConnectOnce) {
+          connect();
+          setTryToConnectOnce(false);
+        }
         localStorage.setItem("dash_pass", pass);
       } else {
         localStorage.removeItem("dash_pass");
       }
     } catch {}
-  }, [connect, pass]);
+  }, [connect, pass, tryToConnectOnce]);
 
   useEffect(() => {
     if (!pass) return;
