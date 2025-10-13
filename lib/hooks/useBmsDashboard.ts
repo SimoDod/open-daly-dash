@@ -42,7 +42,7 @@ export function useBmsDashboard() {
   const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const evtRef = useRef<EventSource | null>(null);
 
-  const [showV, setShowV] = useState(true);
+  const [showV, setShowV] = useState(false);
   const [showI, setShowI] = useState(true);
   const [showSoc, setShowSoc] = useState(true);
 
