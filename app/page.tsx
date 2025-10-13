@@ -113,7 +113,7 @@ export default function Page() {
             </div>
 
             {!connected ? (
-              <Button onClick={connect} aria-label="Connect">
+              <Button disabled={connecting} onClick={connect} aria-label="Connect">
                 Connect
               </Button>
             ) : (

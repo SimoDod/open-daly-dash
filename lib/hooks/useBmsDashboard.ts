@@ -98,14 +98,10 @@ export function useBmsDashboard() {
           case "connected":
             setDevice(evt.device as DeviceInfo);
             setStatus("connected");
-            toast.success("BLE connected", {
-              description: evt.device?.name || "BMS",
-            });
             break;
 
           case "ready":
             setStatus("ready");
-            toast.success("BMS data streaming");
             break;
 
           case "state": {
@@ -164,9 +160,6 @@ export function useBmsDashboard() {
       if (!lastError) {
         setLastError("Event stream error");
       }
-      toast.error("Event stream error", {
-        description: "Check server/network connectivity",
-      });
     };
   }, [pass, paused, scheduleFlush, lastError]);
 
