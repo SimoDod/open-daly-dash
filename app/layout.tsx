@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
+import Providers from "./providers";
 
 export const metadata: Metadata = {
   title: "Daly BMS Dashboard",
@@ -16,7 +17,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className="flex justify-center">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          {children}
+          <Providers>{children}</Providers>
         </ThemeProvider>
       </body>
     </html>
