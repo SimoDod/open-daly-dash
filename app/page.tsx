@@ -113,7 +113,11 @@ export default function Page() {
             </div>
 
             {!connected ? (
-              <Button disabled={connecting} onClick={connect} aria-label="Connect">
+              <Button
+                disabled={connecting}
+                onClick={connect}
+                aria-label="Connect"
+              >
                 Connect
               </Button>
             ) : (
@@ -361,10 +365,6 @@ export default function Page() {
           <Card>
             <CardHeader className="px-4 py-2">
               <CardTitle>Telemetry</CardTitle>
-              <CardDescription>
-                Temperatures, sensors, device metadata and system state (icon
-                only).
-              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-center">
