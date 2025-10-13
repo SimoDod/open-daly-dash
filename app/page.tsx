@@ -55,61 +55,6 @@ export default function Page() {
     cellDelta,
   } = useBmsDashboard();
 
-  const [localChartData, setLocalChartData] = React.useState<any[]>(
-    Array.isArray(chartData) ? chartData : []
-  );
-  const latestChartRef = React.useRef(localChartData);
-  React.useEffect(() => {
-    latestChartRef.current = localChartData;
-  }, [localChartData]);
-
-  React.useEffect(() => {
-    if (Array.isArray(chartData) && chartData.length)
-      setLocalChartData(chartData);
-  }, [chartData]);
-
-  React.useEffect(() => {
-    let mounted = true;
-
-    async function fetchHistory() {
-      try {
-        const res = await fetch(
-          `/api/bms/samples?limit=2000&pass=${encodeURIComponent(pass || "")}`
-        );
-        if (!mounted) return;
-        if (!res.ok) return;
-        const j = await res.json();
-        if (j?.data && Array.isArray(j.data)) {
-          setLocalChartData(j.data);
-        }
-      } catch {}
-    }
-
-    let es: EventSource | null = null;
-    try {
-      es = new EventSource(
-        `/api/bms/events?pass=${encodeURIComponent(pass || "")}`
-      );
-      es.addEventListener("message", (ev) => {
-        try {
-          const obj = JSON.parse(ev.data);
-          if (obj?.event === "state" && obj.snapshot) {
-            const next = [...latestChartRef.current, obj.snapshot].slice(-5000);
-            latestChartRef.current = next;
-            setLocalChartData(next);
-          }
-        } catch {}
-      });
-    } catch {}
-
-    fetchHistory();
-
-    return () => {
-      mounted = false;
-      if (es) es.close();
-    };
-  }, [pass]);
-
   return (
     <div className="min-h-screen min-w-screen bg-background">
       <header className="sticky top-0 z-20 bg-background/90 backdrop-blur border-b px-3">
@@ -397,10 +342,9 @@ export default function Page() {
               </div>
             </CardHeader>
             <CardContent className="px-0">
-              {Array.isArray(localChartData) && localChartData.length ? (
+              {Array.isArray(chartData) && chartData.length ? (
                 <LiveChart
-                  key={localChartData.length}
-                  data={localChartData}
+                  data={chartData}
                   showV={showV}
                   showI={showI}
                   showSoc={showSoc}
