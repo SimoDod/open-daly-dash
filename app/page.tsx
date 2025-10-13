@@ -3,13 +3,7 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -21,6 +15,7 @@ import {
   Zap,
   Plug,
   Battery as BatteryIcon,
+  Diff,
 } from "lucide-react";
 
 import { useBmsDashboard } from "@/lib/hooks/useBmsDashboard";
@@ -244,41 +239,33 @@ export default function Page() {
               </div>
 
               <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Card className="shadow-sm">
-                  <CardContent className="flex items-center gap-3">
-                    <div className="rounded-lg border w-10 h-10 grid place-items-center">
-                      <div className="text-xs">C</div>
-                    </div>
-                    <div className="text-sm">
-                      <div className="font-semibold">
+                <SmallStat
+                  icon={<Diff />}
+                  label="Cells D"
+                  value={
+                    <>
+                      <div>
                         Min:{" "}
                         {snapshot?.cellMin_V != null
                           ? fmt(snapshot.cellMin_V, "V")
                           : "—"}
                       </div>
-                      <div className="font-semibold">
+                      <div>
                         Max:{" "}
                         {snapshot?.cellMax_V != null
                           ? fmt(snapshot.cellMax_V, "V")
                           : "—"}
                       </div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        Delta:{" "}
-                        {cellDelta
-                          ? `${fmt(cellDelta.deltaV, "V")} (${Math.round(
-                              cellDelta.deltaV * 1000 || 0
-                            )} mV)`
-                          : "—"}
-                      </div>
-                    </div>
-                  </CardContent>
-                  <CardHeader className="pt-2 px-4">
-                    <CardTitle className="text-sm">Cell Spread</CardTitle>
-                    <CardDescription>
-                      Min, Max and Delta between cells.
-                    </CardDescription>
-                  </CardHeader>
-                </Card>
+                    </>
+                  }
+                  hint={
+                    cellDelta
+                      ? `Delta: ${fmt(cellDelta.deltaV, "V")} (${Math.round(
+                          cellDelta.deltaV * 1000 || 0
+                        )} mV)`
+                      : "—"
+                  }
+                />
               </div>
             </CardContent>
           </Card>
