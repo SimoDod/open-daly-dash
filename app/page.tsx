@@ -163,9 +163,9 @@ export default function Page() {
                   }
                   hint={
                     snapshot?.remainCapacity_Ah
-                      ? `${snapshot.remainCapacity_Ah.toFixed(
-                          1
-                        )}a / ${snapshot?.ratedCapacity_Ah?.toFixed(1)}a`
+                      ? `${snapshot.remainCapacity_Ah.toFixed(1)}Ah / ${
+                          snapshot?.ratedCapacity_Ah
+                        }`
                       : undefined
                   }
                   icon={(() => {
