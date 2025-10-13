@@ -163,7 +163,9 @@ export default function Page() {
                   }
                   hint={
                     snapshot?.remainCapacity_Ah
-                      ? `Remain ${snapshot.remainCapacity_Ah} Ah`
+                      ? `${snapshot.remainCapacity_Ah.toFixed(
+                          1
+                        )}a / ${snapshot?.ratedCapacity_Ah?.toFixed(1)}a`
                       : undefined
                   }
                   icon={(() => {
@@ -205,7 +207,18 @@ export default function Page() {
                   label="Power"
                   value={
                     snapshot?.voltage_V != null && snapshot?.current_A != null
-                      ? fmt(snapshot.voltage_V * snapshot.current_A, "W")
+                      ? (() => {
+                          const power = snapshot.voltage_V * snapshot.current_A;
+                          const color =
+                            power > 0
+                              ? "text-green-600"
+                              : power < 0
+                              ? "text-red-600"
+                              : "text-gray-700";
+                          return (
+                            <span className={color}>{fmt(power, "W")}</span>
+                          );
+                        })()
                       : "—"
                   }
                   hint={
@@ -216,29 +229,7 @@ export default function Page() {
                       : undefined
                   }
                 />
-                <SmallStat
-                  icon={<Plug />}
-                  label="Current"
-                  value={fmt(snapshot?.current_A, "A")}
-                  hint={
-                    snapshot?.ratedCapacity_Ah
-                      ? `Rated ${snapshot.ratedCapacity_Ah} Ah`
-                      : undefined
-                  }
-                />
-                <SmallStat
-                  icon={<Zap />}
-                  label="Voltage"
-                  value={fmt(snapshot?.voltage_V, "V")}
-                  hint={
-                    snapshot?.packFromCells_V
-                      ? `Cells sum: ${fmt(snapshot.packFromCells_V, "V")}`
-                      : undefined
-                  }
-                />
-              </div>
 
-              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <SmallStat
                   icon={<Diff />}
                   label="Cells D"
@@ -259,11 +250,20 @@ export default function Page() {
                     </>
                   }
                   hint={
-                    cellDelta
-                      ? `Delta: ${fmt(cellDelta.deltaV, "V")} (${Math.round(
-                          cellDelta.deltaV * 1000 || 0
-                        )} mV)`
-                      : "—"
+                    <>
+                      <div>
+                        {cellDelta
+                          ? `Delta: ${fmt(cellDelta.deltaV, "V")} (${Math.round(
+                              cellDelta.deltaV * 1000 || 0
+                            )} mV)`
+                          : "—"}
+                      </div>
+                      <div>
+                        {snapshot?.packFromCells_V
+                          ? `Cells sum: ${fmt(snapshot.packFromCells_V, "V")}`
+                          : undefined}
+                      </div>
+                    </>
                   }
                 />
               </div>
