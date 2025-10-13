@@ -17,7 +17,6 @@ import {
   PlugZap,
   Pause,
   Play,
-  Trash2,
   History,
   Zap,
   Plug,
