@@ -43,7 +43,7 @@ export default function BatteryWithPercentage({
       role="img"
       aria-label={ariaLabel}
       style={{ width: size, height: size }}
-      className={`inline-grid  place-items-center rounded-full ${className}`}
+      className={`relative inline-grid place-items-center rounded-full ${className}`}
     >
       <svg
         width={size}
@@ -99,12 +99,9 @@ export default function BatteryWithPercentage({
       </svg>
 
       {showLabel && (
-        <div
-          className="pointer-events-none absolute grid place-items-center"
-          style={{ width: size * 0.8, height: size * 0.8 }}
-        >
+        <div className="pointer-events-none absolute inset-0 grid place-items-center">
           <span
-            className="leading-none text-xs font-bold"
+            className="leading-none text-sm font-bold"
             style={{
               color: pct == null ? "#6b7280" : color,
             }}
