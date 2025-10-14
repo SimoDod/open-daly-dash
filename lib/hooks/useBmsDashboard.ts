@@ -244,32 +244,45 @@ export function useBmsDashboard() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const handleVisible = () => {
+    const ensureConnectingAndReopen = () => {
       if (!pass) return;
-
       if (connected) return;
 
       setConnecting(true);
       setStatus("connecting");
 
-      if (
-        !evtRef.current ||
-        (evtRef.current && evtRef.current.readyState === 2)
-      ) {
-        connect();
-      }
+      window.setTimeout(() => {
+        if (connected) {
+          setConnecting(false);
+          setStatus("connected");
+          return;
+        }
+
+        const es = evtRef.current;
+        const esClosed = !es || es.readyState === 2;
+        const esConnecting = es && es.readyState === 0;
+        const esOpenButNotMarked = es && es.readyState === 1 && !connected;
+
+        if (esClosed || esOpenButNotMarked) {
+          connect();
+        } else if (esConnecting) {
+          setConnecting(true);
+        } else {
+          connect();
+        }
+      }, 50);
     };
 
     const onVisibility = () => {
-      if (document.visibilityState === "visible") handleVisible();
+      if (document.visibilityState === "visible") ensureConnectingAndReopen();
     };
 
-    window.addEventListener("visibilitychange", onVisibility);
-    window.addEventListener("focus", handleVisible);
+    window.addEventListener("visibilitychange", onVisibility, false);
+    window.addEventListener("focus", ensureConnectingAndReopen, false);
 
     return () => {
-      window.removeEventListener("visibilitychange", onVisibility);
-      window.removeEventListener("focus", handleVisible);
+      window.removeEventListener("visibilitychange", onVisibility, false);
+      window.removeEventListener("focus", ensureConnectingAndReopen, false);
     };
   }, [pass, connected, connect]);
 
