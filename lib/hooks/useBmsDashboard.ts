@@ -16,7 +16,7 @@ type Status =
   | "disconnected";
 
 export function useBmsDashboard() {
-  const initialPass = (() => {
+  const [pass, setPass] = useState<string>(() => {
     try {
       return typeof window !== "undefined"
         ? localStorage.getItem("dash_pass") || ""
@@ -24,19 +24,11 @@ export function useBmsDashboard() {
     } catch {
       return "";
     }
-  })();
-
-  const [pass, setPass] = useState<string>(() => initialPass);
-
-  const [status, setStatus] = useState<Status>(() =>
-    initialPass ? "connecting" : "idle"
-  );
-
-  const [connecting, setConnecting] = useState<boolean>(
-    () => status === "connecting"
-  );
+  });
 
   const [connected, setConnected] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [status, setStatus] = useState<Status>("idle");
   const [lastError, setLastError] = useState<string | null>(null);
   const [tryToConnectOnce, setTryToConnectOnce] = useState<boolean>(true);
 
@@ -226,23 +218,16 @@ export function useBmsDashboard() {
   );
 
   useEffect(() => {
-    setConnecting(status === "connecting");
-  }, [status]);
-
-  useEffect(() => {
     try {
-      if (!pass) {
-        setStatus("idle");
-        return;
+      if (pass) {
+        if (tryToConnectOnce) {
+          connect();
+          setTryToConnectOnce(false);
+        }
+        localStorage.setItem("dash_pass", pass);
+      } else {
+        localStorage.removeItem("dash_pass");
       }
-
-      if (tryToConnectOnce) {
-        setStatus("connecting");
-        connect();
-        setTryToConnectOnce(false);
-      }
-
-      localStorage.setItem("dash_pass", pass);
     } catch {}
   }, [connect, pass, tryToConnectOnce]);
 

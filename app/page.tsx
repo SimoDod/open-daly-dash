@@ -246,7 +246,7 @@ export default function Page() {
 
               <TableFooter>
                 <TableRow>
-                  <TableCell colSpan={3}>Sum of cells (V):</TableCell>
+                  <TableCell colSpan={3}>Sum of cells:</TableCell>
                   <TableCell>
                     {fmt(snapshot?.packFromCells_V, "V", 3)}
                   </TableCell>
@@ -255,9 +255,7 @@ export default function Page() {
                   <TableCell colSpan={3}>Delta:</TableCell>
                   <TableCell>
                     {cellDelta &&
-                      `${fmt(cellDelta.deltaV, "V")} (${Math.round(
-                        cellDelta.deltaV * 1000 || 0
-                      )} mV)`}
+                      `${Math.round(cellDelta.deltaV * 1000 || 0)} mV`}
                   </TableCell>
                 </TableRow>
               </TableFooter>
