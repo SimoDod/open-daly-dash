@@ -15,7 +15,6 @@ import {
   Zap,
   Plug,
   Battery as BatteryIcon,
-  Loader2,
 } from "lucide-react";
 
 import { useBmsDashboard } from "@/lib/hooks/useBmsDashboard";
@@ -79,16 +78,6 @@ export default function Page() {
                   ? "Connecting..."
                   : "Not connected"}
               </div>
-            </div>
-            <div className="ml-2">
-              {connecting ? (
-                <span
-                  className="inline-flex items-center gap-2 text-xs"
-                  aria-hidden
-                >
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                </span>
-              ) : null}
             </div>
           </div>
 
