@@ -106,7 +106,7 @@ export default function BatteryWithPercentage({
               color: pct == null ? "#6b7280" : color,
             }}
           >
-            {pct == null ? "—" : `${pct.toFixed(1)}%`}
+            {pct == null ? "—" : `${pct.toFixed(1)}`}
           </span>
         </div>
       )}

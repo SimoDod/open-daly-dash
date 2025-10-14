@@ -145,11 +145,9 @@ export function useBmsDashboard() {
             break;
 
           default:
-            // ignore other events or add more cases if you forward more
             break;
         }
       } catch {
-        // ignore malformed
       }
     };
 

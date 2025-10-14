@@ -16,6 +16,7 @@ import {
   Plug,
   Battery as BatteryIcon,
   Diff,
+  Table,
 } from "lucide-react";
 
 import { useBmsDashboard } from "@/lib/hooks/useBmsDashboard";
@@ -25,6 +26,15 @@ import { SystemStateIcon } from "@/components/dashboard/SystemStateIcon";
 import { fmt } from "@/lib/utils/fmt";
 import SmallStat from "@/components/dashboard/SmallStat";
 import BatteryWithPercentage from "@/components/battery-with-percentage";
+import {
+  TableCaption,
+  TableHeader,
+  TableRow,
+  TableHead,
+  TableBody,
+  TableCell,
+  TableFooter,
+} from "@/components/ui/table";
 
 export default function Page() {
   const {
@@ -161,7 +171,7 @@ export default function Page() {
                   <BatteryWithPercentage
                     socPercentage={snapshot?.soc_pct ?? 70}
                   />
-                  <Label className="text-muted-foreground">SoC</Label>
+                  <Label className="text-muted-foreground">SoC (%)</Label>
                 </div>
                 <div className="flex flex-col items-center justify-between gap-2">
                   <div className="flex items-center h-14">
@@ -244,6 +254,32 @@ export default function Page() {
                 />
               </div>
             </CardContent>
+          </Card>
+
+          <Card>
+            <Table>
+              <TableCaption>A list of your recent invoices.</TableCaption>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Cell</TableHead>
+                  <TableHead>Voltage</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {snapshot?.cells_V.map((cellV, index) => (
+                  <TableRow key={index}>
+                    <TableCell className="font-medium">{index}</TableCell>
+                    <TableCell>{cellV}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+              <TableFooter>
+                <TableRow>
+                  <TableCell colSpan={3}>Total</TableCell>
+                  <TableCell className="text-right">$2,500.00</TableCell>
+                </TableRow>
+              </TableFooter>
+            </Table>
           </Card>
 
           {/* Live Telemetry: content first */}

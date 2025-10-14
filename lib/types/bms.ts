@@ -9,6 +9,7 @@ export type Snapshot = {
   ratedCapacity_Ah?: number;
   remainCapacity_Ah?: number;
   system_state?: number | string;
+  cells_V: number[];
 };
 
 export type DeviceInfo = {
