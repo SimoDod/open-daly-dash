@@ -195,16 +195,12 @@ export default function Page() {
                   <Label className="text-muted-foreground">Voltage</Label>
                 </div>
               </div>
-              <div className="flex gap-4 border-t-2 justify-evenly pt-2 text-muted-foreground text-sm">
-                <div>Min: {fmt(snapshot?.cellMin_V, "V")}</div>
-                <div>Max: {fmt(snapshot?.cellMax_V, "V")}</div>
-                <div>
-                  {cellDelta
-                    ? `Delta: ${fmt(cellDelta.deltaV, "V")} (${Math.round(
-                        cellDelta.deltaV * 1000 || 0
-                      )} mV)`
-                    : "—"}
-                </div>
+              <div className="border-t-2 pt-2 text-muted-foreground text-sm">
+                {cellDelta
+                  ? `Delta: ${fmt(cellDelta.deltaV, "V")} (${Math.round(
+                      cellDelta.deltaV * 1000 || 0
+                    )} mV)`
+                  : "—"}
               </div>
             </CardContent>
           </Card>
