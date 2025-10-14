@@ -16,7 +16,7 @@ type Status =
   | "disconnected";
 
 export function useBmsDashboard() {
-  const [pass, setPass] = useState<string>(() => {
+  const initialPass = (() => {
     try {
       return typeof window !== "undefined"
         ? localStorage.getItem("dash_pass") || ""
@@ -24,11 +24,19 @@ export function useBmsDashboard() {
     } catch {
       return "";
     }
-  });
+  })();
+
+  const [pass, setPass] = useState<string>(() => initialPass);
+
+  const [status, setStatus] = useState<Status>(() =>
+    initialPass ? "connecting" : "idle"
+  );
+
+  const [connecting, setConnecting] = useState<boolean>(
+    () => status === "connecting"
+  );
 
   const [connected, setConnected] = useState(false);
-  const [connecting, setConnecting] = useState(false);
-  const [status, setStatus] = useState<Status>("idle");
   const [lastError, setLastError] = useState<string | null>(null);
   const [tryToConnectOnce, setTryToConnectOnce] = useState<boolean>(true);
 
@@ -60,147 +68,107 @@ export function useBmsDashboard() {
 
   const connect = useCallback(() => {
     if (!pass) return;
-
     try {
       localStorage.setItem("dash_pass", pass);
     } catch {}
-
-    // Immediate UI state
+    evtRef.current?.close();
     setConnecting(true);
     setConnected(false);
     setStatus("connecting");
     setLastError(null);
 
-    // Allow one render frame so spinner appears before the EventSource opens.
-    // Use requestAnimationFrame when available, fallback to setTimeout.
-    const startEs = () => {
-      // defensive close any existing source
-      try {
-        evtRef.current?.close();
-      } catch {}
+    const es = new EventSource(
+      `/api/bms/events?pass=${encodeURIComponent(pass)}`
+    );
+    evtRef.current = es;
 
-      // create new EventSource
-      const es = new EventSource(
-        `/api/bms/events?pass=${encodeURIComponent(pass)}`
-      );
-      evtRef.current = es;
-
-      // lifecycle handlers
-      es.onopen = () => {
-        console.debug("[BMS] es.onopen");
-        // defer clearing connecting briefly so UI update shows
-        setTimeout(() => {
-          setConnecting(false);
-          setConnected(true);
-          setStatus("connected");
-        }, 0);
-      };
-
-      es.onmessage = (msg) => {
-        try {
-          const evt = JSON.parse(msg.data);
-          console.debug("[BMS] evt", evt.event, evt);
-
-          switch (evt.event) {
-            case "hello":
-              setConnected(true);
-              setConnecting(false);
-              setStatus("connected");
-              break;
-
-            case "connecting":
-              setStatus("connecting");
-              setConnecting(true);
-              break;
-
-            case "connected":
-              setDevice(evt.device as DeviceInfo);
-              setStatus("connected");
-              setConnecting(false);
-              break;
-
-            case "ready":
-              setStatus("ready");
-              setConnecting(false);
-              break;
-
-            case "state": {
-              const s: Snapshot = evt.snapshot || {};
-              setSnapshot(s);
-              if (!paused) {
-                const p: Point = {
-                  ts: new Date().toLocaleTimeString(),
-                  v: s.voltage_V,
-                  i: s.current_A,
-                  soc: s.soc_pct,
-                };
-                bufferRef.current.push(p);
-                if (bufferRef.current.length > MAX_POINTS * 2) {
-                  bufferRef.current = bufferRef.current.slice(-MAX_POINTS);
-                }
-                scheduleFlush();
-              }
-              break;
-            }
-
-            case "no_data":
-              setStatus("degraded");
-              toast.warning("No data from BMS", {
-                description: `Idle for ${Math.round(
-                  (evt.for_ms || 0) / 1000
-                )}s`,
-              });
-              break;
-
-            case "tx_error":
-              setStatus((s) => (s === "ready" ? "degraded" : s));
-              setLastError(evt.message || "Write error");
-              toast.error("BLE write failed", { description: evt.message });
-              break;
-
-            case "disconnected":
-              setConnecting(false);
-              setConnected(false);
-              setStatus("disconnected");
-              setLastError(evt.reason || "Disconnected");
-              toast.error("BLE disconnected", { description: evt.reason });
-              break;
-
-            default:
-              break;
-          }
-        } catch (err) {
-          console.debug("[BMS] onmessage parse error", err);
-        }
-      };
-
-      es.onerror = (err) => {
-        console.debug("[BMS] es.onerror", err);
-        setConnecting(false);
-        setConnected(false);
-        setStatus("disconnected");
-        if (!lastError) setLastError("Event stream error");
-        // close stale source to allow fresh reconnect attempts
-        try {
-          es.close();
-        } catch {}
-      };
+    es.onopen = () => {
+      setConnecting(false);
+      setConnected(true);
+      setStatus("connected");
     };
 
-    if (typeof window !== "undefined" && "requestAnimationFrame" in window) {
-      // requestAnimationFrame may be suspended while backgrounded; still safe:
-      requestAnimationFrame(() => {
-        // additional tiny delay to ensure the DOM updates the spinner
-        window.setTimeout(startEs, 30);
-      });
-      // also set a failsafe: if rAF never runs (weird browser), fallback after 150ms
-      window.setTimeout(() => {
-        if (!evtRef.current) startEs();
-      }, 150);
-    } else {
-      // fallback for non-browser environments
-      setTimeout(startEs, 0);
-    }
+    es.onmessage = (msg) => {
+      try {
+        const evt = JSON.parse(msg.data);
+
+        switch (evt.event) {
+          case "hello":
+            setConnected(true);
+            setConnecting(false);
+            setStatus("connected");
+            break;
+
+          case "connecting":
+            setStatus("connecting");
+            setConnecting(true); // << ensure boolean follows status
+            break;
+
+          case "connected":
+            setDevice(evt.device as DeviceInfo);
+            setStatus("connected");
+            setConnecting(false); // << clear connecting flag
+            break;
+
+          case "ready":
+            setStatus("ready");
+            setConnecting(false);
+            break;
+
+          case "state": {
+            const s: Snapshot = evt.snapshot || {};
+            setSnapshot(s);
+            if (!paused) {
+              const p: Point = {
+                ts: new Date().toLocaleTimeString(),
+                v: s.voltage_V,
+                i: s.current_A,
+                soc: s.soc_pct,
+              };
+              bufferRef.current.push(p);
+              if (bufferRef.current.length > MAX_POINTS * 2) {
+                bufferRef.current = bufferRef.current.slice(-MAX_POINTS);
+              }
+              scheduleFlush();
+            }
+            break;
+          }
+
+          case "no_data":
+            setStatus("degraded");
+            toast.warning("No data from BMS", {
+              description: `Idle for ${Math.round((evt.for_ms || 0) / 1000)}s`,
+            });
+            break;
+
+          case "tx_error":
+            setStatus((s) => (s === "ready" ? "degraded" : s));
+            setLastError(evt.message || "Write error");
+            toast.error("BLE write failed", { description: evt.message });
+            break;
+
+          case "disconnected":
+            setConnecting(false);
+            setConnected(false);
+            setStatus("disconnected");
+            setLastError(evt.reason || "Disconnected");
+            toast.error("BLE disconnected", { description: evt.reason });
+            break;
+
+          default:
+            break;
+        }
+      } catch {}
+    };
+
+    es.onerror = () => {
+      setConnecting(false);
+      setConnected(false);
+      setStatus("disconnected");
+      if (!lastError) {
+        setLastError("Event stream error");
+      }
+    };
   }, [pass, paused, scheduleFlush, lastError]);
 
   const disconnect = useCallback(() => {
@@ -258,16 +226,23 @@ export function useBmsDashboard() {
   );
 
   useEffect(() => {
+    setConnecting(status === "connecting");
+  }, [status]);
+
+  useEffect(() => {
     try {
-      if (pass) {
-        if (tryToConnectOnce) {
-          connect();
-          setTryToConnectOnce(false);
-        }
-        localStorage.setItem("dash_pass", pass);
-      } else {
-        localStorage.removeItem("dash_pass");
+      if (!pass) {
+        setStatus("idle");
+        return;
       }
+
+      if (tryToConnectOnce) {
+        setStatus("connecting");
+        connect();
+        setTryToConnectOnce(false);
+      }
+
+      localStorage.setItem("dash_pass", pass);
     } catch {}
   }, [connect, pass, tryToConnectOnce]);
 

@@ -195,13 +195,6 @@ export default function Page() {
                   <Label className="text-muted-foreground">Voltage</Label>
                 </div>
               </div>
-              <div className="border-t-2 pt-2 text-muted-foreground text-sm">
-                {cellDelta
-                  ? `Delta: ${fmt(cellDelta.deltaV, "V")} (${Math.round(
-                      cellDelta.deltaV * 1000 || 0
-                    )} mV)`
-                  : "—"}
-              </div>
             </CardContent>
           </Card>
 
@@ -254,7 +247,18 @@ export default function Page() {
               <TableFooter>
                 <TableRow>
                   <TableCell colSpan={3}>Sum of cells (V):</TableCell>
-                  <TableCell>{snapshot?.packFromCells_V?.toFixed(3)}</TableCell>
+                  <TableCell>
+                    {fmt(snapshot?.packFromCells_V, "V", 3)}
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell colSpan={3}>Delta:</TableCell>
+                  <TableCell>
+                    {cellDelta &&
+                      `${fmt(cellDelta.deltaV, "V")} (${Math.round(
+                        cellDelta.deltaV * 1000 || 0
+                      )} mV)`}
+                  </TableCell>
                 </TableRow>
               </TableFooter>
             </Table>
