@@ -42,9 +42,15 @@ export function useBmsDashboard() {
   const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const evtRef = useRef<EventSource | null>(null);
 
+  const readyStatePollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const [showV, setShowV] = useState(false);
   const [showI, setShowI] = useState(true);
   const [showSoc, setShowSoc] = useState(true);
+
+  const [isOnline, setIsOnline] = useState(
+    typeof navigator !== "undefined" ? navigator.onLine : true
+  );
 
   const scheduleFlush = useCallback(() => {
     if (flushTimerRef.current) return;
@@ -63,21 +69,54 @@ export function useBmsDashboard() {
     try {
       localStorage.setItem("dash_pass", pass);
     } catch {}
+
+    // close any existing ES
     evtRef.current?.close();
+    evtRef.current = null;
+
+    // reflect UI that we're attempting connection
     setConnecting(true);
     setConnected(false);
     setStatus("connecting");
     setLastError(null);
+
+    if (!isOnline) {
+      setStatus("disconnected");
+      setConnecting(false);
+      setLastError("Offline");
+      return;
+    }
 
     const es = new EventSource(
       `/api/bms/events?pass=${encodeURIComponent(pass)}`
     );
     evtRef.current = es;
 
+    // poll readyState so UI can show "connecting" while browser auto-reconnects
+    if (readyStatePollRef.current) clearInterval(readyStatePollRef.current);
+    readyStatePollRef.current = setInterval(() => {
+      if (!evtRef.current) return;
+      const rs = evtRef.current.readyState; // 0 = connecting, 1 = open, 2 = closed
+      if (rs === 0) {
+        setConnecting(true);
+        setConnected(false);
+        setStatus("connecting");
+      } else if (rs === 1) {
+        setConnecting(false);
+        setConnected(true);
+        if (status !== "ready") setStatus("connected");
+      } else if (rs === 2) {
+        setConnecting(false);
+        setConnected(false);
+        setStatus("disconnected");
+      }
+    }, 800);
+
     es.onopen = () => {
       setConnecting(false);
       setConnected(true);
       setStatus("connected");
+      setLastError(null);
     };
 
     es.onmessage = (msg) => {
@@ -154,18 +193,27 @@ export function useBmsDashboard() {
     };
 
     es.onerror = () => {
-      setConnecting(false);
+      // EventSource auto-reconnects, reflect that in UI.
+      setConnecting(true);
       setConnected(false);
-      setStatus("disconnected");
-      if (!lastError) {
+      if (isOnline) {
+        setStatus("connecting");
         setLastError("Event stream error");
+      } else {
+        setStatus("disconnected");
+        setLastError("Offline");
       }
+      // keep EventSource open (browser will try to reconnect)
     };
-  }, [pass, paused, scheduleFlush, lastError]);
+  }, [pass, paused, scheduleFlush, isOnline, status]);
 
   const disconnect = useCallback(() => {
     evtRef.current?.close();
     evtRef.current = null;
+    if (readyStatePollRef.current) {
+      clearInterval(readyStatePollRef.current);
+      readyStatePollRef.current = null;
+    }
     setConnecting(false);
     setConnected(false);
     setStatus("disconnected");
@@ -217,12 +265,14 @@ export function useBmsDashboard() {
     [pass]
   );
 
+  // attempt initial connect once when pass available
   useEffect(() => {
     try {
       if (pass) {
         if (tryToConnectOnce) {
+          // set UI as connecting immediately to avoid brief "idle" state while ES starts
           setStatus("connecting");
-          setConnecting(true); //TODO remove
+          setConnecting(true);
           connect();
           setTryToConnectOnce(false);
         }
@@ -233,15 +283,50 @@ export function useBmsDashboard() {
     } catch {}
   }, [connect, pass, tryToConnectOnce]);
 
+  // load history on mount/pass change
   useEffect(() => {
     if (!pass) return;
     loadHistory("24h");
     return () => {
       evtRef.current?.close();
       if (flushTimerRef.current) clearTimeout(flushTimerRef.current);
+      if (readyStatePollRef.current) {
+        clearInterval(readyStatePollRef.current);
+        readyStatePollRef.current = null;
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pass]);
+
+  // monitor navigator online/offline and react
+  useEffect(() => {
+    function onOnline() {
+      setIsOnline(true);
+      // show connecting while browser restores SSE
+      setStatus("connecting");
+      setConnecting(true);
+      // if we have a pass and there's no active open ES, try connect
+      // allow connect() to no-op if already open
+      if (pass) connect();
+    }
+    function onOffline() {
+      setIsOnline(false);
+      setConnecting(false);
+      setConnected(false);
+      setStatus("disconnected");
+      setLastError("Offline");
+      // keep ES closed to avoid leaks
+      evtRef.current?.close();
+      evtRef.current = null;
+    }
+
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
+  }, [connect, pass]);
 
   const cellDelta = useMemo(() => {
     if (snapshot?.cellMin_V == null || snapshot?.cellMax_V == null) return null;
