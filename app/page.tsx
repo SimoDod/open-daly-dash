@@ -243,11 +243,6 @@ export default function Page() {
                             )} mV)`
                           : "—"}
                       </div>
-                      <div>
-                        {snapshot?.packFromCells_V
-                          ? `Cells sum: ${fmt(snapshot.packFromCells_V, "V")}`
-                          : undefined}
-                      </div>
                     </>
                   }
                 />
