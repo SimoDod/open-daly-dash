@@ -93,15 +93,18 @@ export function useBmsDashboard() {
 
           case "connecting":
             setStatus("connecting");
+            setConnecting(true); // << ensure boolean follows status
             break;
 
           case "connected":
             setDevice(evt.device as DeviceInfo);
             setStatus("connected");
+            setConnecting(false); // << clear connecting flag
             break;
 
           case "ready":
             setStatus("ready");
+            setConnecting(false);
             break;
 
           case "state": {
@@ -147,8 +150,7 @@ export function useBmsDashboard() {
           default:
             break;
         }
-      } catch {
-      }
+      } catch {}
     };
 
     es.onerror = () => {

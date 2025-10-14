@@ -15,7 +15,7 @@ import {
   Zap,
   Plug,
   Battery as BatteryIcon,
-  Diff,
+  Loader2,
 } from "lucide-react";
 
 import { useBmsDashboard } from "@/lib/hooks/useBmsDashboard";
@@ -23,7 +23,6 @@ import { LiveChart } from "@/components/dashboard/LiveChart";
 import { RangeSelector } from "@/components/dashboard/RangeSelector";
 import { SystemStateIcon } from "@/components/dashboard/SystemStateIcon";
 import { fmt } from "@/lib/utils/fmt";
-import SmallStat from "@/components/dashboard/SmallStat";
 import BatteryWithPercentage from "@/components/battery-with-percentage";
 import {
   TableHeader,
@@ -81,31 +80,13 @@ export default function Page() {
                   : "Not connected"}
               </div>
             </div>
-
             <div className="ml-2">
               {connecting ? (
-                <span className="inline-flex items-center gap-2 text-xs">
-                  <svg
-                    className="w-4 h-4 animate-spin"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    aria-hidden
-                  >
-                    <circle
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                      strokeOpacity="0.15"
-                    />
-                    <path
-                      d="M22 12a10 10 0 00-10-10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                      strokeLinecap="round"
-                    />
-                  </svg>
+                <span
+                  className="inline-flex items-center gap-2 text-xs"
+                  aria-hidden
+                >
+                  <Loader2 className="w-4 h-4 animate-spin" />
                 </span>
               ) : null}
             </div>
@@ -124,13 +105,14 @@ export default function Page() {
                 onClick={connect}
                 aria-label="Connect"
               >
-                Connect
+                {connecting ? "Connecting…" : "Connect"}
               </Button>
             ) : (
               <Button
                 variant="outline"
                 onClick={disconnect}
                 aria-label="Disconnect"
+                disabled={connecting}
               >
                 Disconnect
               </Button>
@@ -141,7 +123,7 @@ export default function Page() {
         </div>
       </header>
 
-      {!connected && (
+      {!connected && !connecting && (
         <div className="w-screen flex justify-end ml-[-5%]">
           <Input
             id="pass"
@@ -194,57 +176,35 @@ export default function Page() {
                         : "—"}
                     </div>
                   </div>
-                  <Label className="text-muted-foreground">Power (W)</Label>
+                  <Label className="text-muted-foreground">Power</Label>
                 </div>
                 <div className="flex flex-col items-center justify-between gap-2">
                   <div className="flex items-center h-14">
                     <div className="font-semibold truncate">
-                      {snapshot?.current_A?.toFixed(1) ?? "—"}
+                      {fmt(snapshot?.current_A, "A", 1)}
                     </div>
                   </div>
-                  <Label className="text-muted-foreground">Current (A)</Label>
+                  <Label className="text-muted-foreground">Current</Label>
                 </div>
                 <div className="flex flex-col items-center justify-between gap-2">
                   <div className="flex items-center h-14">
                     <div className="font-semibold truncate">
-                      {snapshot?.voltage_V ?? "—"}
+                      {fmt(snapshot?.voltage_V, "V", 1)}
                     </div>
                   </div>
-                  <Label className="text-muted-foreground">Voltage (V)</Label>
+                  <Label className="text-muted-foreground">Voltage</Label>
                 </div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 border-t-2">
-                <SmallStat
-                  icon={<Diff />}
-                  label="Cells D"
-                  value={
-                    <>
-                      <div>
-                        Min:{" "}
-                        {snapshot?.cellMin_V != null
-                          ? fmt(snapshot.cellMin_V, "V")
-                          : "—"}
-                      </div>
-                      <div>
-                        Max:{" "}
-                        {snapshot?.cellMax_V != null
-                          ? fmt(snapshot.cellMax_V, "V")
-                          : "—"}
-                      </div>
-                    </>
-                  }
-                  hint={
-                    <>
-                      <div>
-                        {cellDelta
-                          ? `Delta: ${fmt(cellDelta.deltaV, "V")} (${Math.round(
-                              cellDelta.deltaV * 1000 || 0
-                            )} mV)`
-                          : "—"}
-                      </div>
-                    </>
-                  }
-                />
+              <div className="flex gap-4  border-t-2 justify-evenly pt-2">
+                <div>Min: {fmt(snapshot?.cellMin_V, "V")}</div>
+                <div>Max: {fmt(snapshot?.cellMax_V, "V")}</div>
+                <div>
+                  {cellDelta
+                    ? `Delta: ${fmt(cellDelta.deltaV, "V")} (${Math.round(
+                        cellDelta.deltaV * 1000 || 0
+                      )} mV)`
+                    : "—"}
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -313,15 +273,27 @@ export default function Page() {
               </div>
 
               <div className="flex items-center gap-2">
-                <RangeSelector
-                  value={range}
-                  onChange={(r: any) => {
-                    setRange(r);
-                    loadHistory(r);
-                  }}
-                />
+                {/* RangeSelector wrapper */}
+                <div
+                  className={connecting ? "pointer-events-none opacity-50" : ""}
+                  aria-disabled={connecting}
+                >
+                  <RangeSelector
+                    value={range}
+                    onChange={(r: any) => {
+                      setRange(r);
+                      loadHistory(r);
+                    }}
+                  />
+                </div>
 
-                <div className="flex items-center gap-2">
+                {/* Control buttons */}
+                <div
+                  className={`flex items-center gap-2 ${
+                    connecting ? "pointer-events-none opacity-50" : ""
+                  }`}
+                  aria-disabled={connecting}
+                >
                   <button
                     onClick={() => setShowV((s: any) => !s)}
                     className={`p-2 rounded-md border ${
@@ -329,6 +301,7 @@ export default function Page() {
                     }`}
                     aria-pressed={showV}
                     aria-label="toggle-voltage"
+                    disabled={connecting}
                   >
                     <Zap size={16} />
                   </button>
@@ -340,6 +313,7 @@ export default function Page() {
                     }`}
                     aria-pressed={showI}
                     aria-label="toggle-current"
+                    disabled={connecting}
                   >
                     <Plug size={16} />
                   </button>
@@ -351,6 +325,7 @@ export default function Page() {
                     }`}
                     aria-pressed={showSoc}
                     aria-label="toggle-soc"
+                    disabled={connecting}
                   >
                     <BatteryIcon size={16} />
                   </button>
@@ -360,6 +335,7 @@ export default function Page() {
                     className="p-2 rounded-md border bg-muted/5"
                     aria-pressed={paused}
                     aria-label="pause"
+                    disabled={connecting}
                   >
                     {paused ? <Play size={16} /> : <Pause size={16} />}
                   </button>
