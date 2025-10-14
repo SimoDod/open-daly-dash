@@ -70,11 +70,9 @@ export function useBmsDashboard() {
       localStorage.setItem("dash_pass", pass);
     } catch {}
 
-    // close any existing ES
     evtRef.current?.close();
     evtRef.current = null;
 
-    // reflect UI that we're attempting connection
     setConnecting(true);
     setConnected(false);
     setStatus("connecting");
@@ -92,7 +90,6 @@ export function useBmsDashboard() {
     );
     evtRef.current = es;
 
-    // poll readyState so UI can show "connecting" while browser auto-reconnects
     if (readyStatePollRef.current) clearInterval(readyStatePollRef.current);
     readyStatePollRef.current = setInterval(() => {
       if (!evtRef.current) return;
@@ -193,7 +190,6 @@ export function useBmsDashboard() {
     };
 
     es.onerror = () => {
-      // EventSource auto-reconnects, reflect that in UI.
       setConnecting(true);
       setConnected(false);
       if (isOnline) {
@@ -203,7 +199,6 @@ export function useBmsDashboard() {
         setStatus("disconnected");
         setLastError("Offline");
       }
-      // keep EventSource open (browser will try to reconnect)
     };
   }, [pass, paused, scheduleFlush, isOnline, status]);
 
@@ -265,12 +260,10 @@ export function useBmsDashboard() {
     [pass]
   );
 
-  // attempt initial connect once when pass available
   useEffect(() => {
     try {
       if (pass) {
         if (tryToConnectOnce) {
-          // set UI as connecting immediately to avoid brief "idle" state while ES starts
           setStatus("connecting");
           setConnecting(true);
           connect();
@@ -283,7 +276,6 @@ export function useBmsDashboard() {
     } catch {}
   }, [connect, pass, tryToConnectOnce]);
 
-  // load history on mount/pass change
   useEffect(() => {
     if (!pass) return;
     loadHistory("24h");
@@ -298,15 +290,12 @@ export function useBmsDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pass]);
 
-  // monitor navigator online/offline and react
   useEffect(() => {
     function onOnline() {
       setIsOnline(true);
-      // show connecting while browser restores SSE
       setStatus("connecting");
       setConnecting(true);
-      // if we have a pass and there's no active open ES, try connect
-      // allow connect() to no-op if already open
+
       if (pass) connect();
     }
     function onOffline() {
@@ -315,7 +304,7 @@ export function useBmsDashboard() {
       setConnected(false);
       setStatus("disconnected");
       setLastError("Offline");
-      // keep ES closed to avoid leaks
+
       evtRef.current?.close();
       evtRef.current = null;
     }
