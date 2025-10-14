@@ -58,7 +58,6 @@ export default function Page() {
     paused,
     togglePause,
     cellDelta,
-    status
   } = useBmsDashboard();
 
   return (
@@ -123,7 +122,6 @@ export default function Page() {
           </div>
         </div>
       </header>
-      <div>{connecting} Status{status}</div>
 
       {!connected && !connecting && (
         <div className="w-screen flex justify-end ml-[-5%]">

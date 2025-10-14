@@ -93,13 +93,13 @@ export function useBmsDashboard() {
 
           case "connecting":
             setStatus("connecting");
-            setConnecting(true); // << ensure boolean follows status
+            setConnecting(true);
             break;
 
           case "connected":
             setDevice(evt.device as DeviceInfo);
             setStatus("connected");
-            setConnecting(false); // << clear connecting flag
+            setConnecting(false);
             break;
 
           case "ready":
@@ -221,6 +221,8 @@ export function useBmsDashboard() {
     try {
       if (pass) {
         if (tryToConnectOnce) {
+          setStatus("connecting");
+          setConnecting(true); //TODO remove
           connect();
           setTryToConnectOnce(false);
         }
