@@ -34,6 +34,7 @@ import {
   TableFooter,
   Table,
 } from "@/components/ui/table";
+import { ReactElement } from "react";
 
 export default function Page() {
   const {
@@ -167,9 +168,7 @@ export default function Page() {
             <CardContent className="px-4 py-4">
               <div className="flex w-full justify-evenly mb-5">
                 <div className="flex flex-col items-center justify-between gap-2">
-                  <BatteryWithPercentage
-                    socPercentage={snapshot?.soc_pct ?? 70}
-                  />
+                  <BatteryWithPercentage socPercentage={snapshot?.soc_pct} />
                   <Label className="text-muted-foreground">SoC (%)</Label>
                 </div>
                 <div className="flex flex-col items-center justify-between gap-2">
@@ -255,21 +254,51 @@ export default function Page() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Cell</TableHead>
-                  <TableHead>Voltage</TableHead>
+                  <TableHead>Voltage (V)</TableHead>
+                  <TableHead>Cell</TableHead>
+                  <TableHead>Voltage (V)</TableHead>
                 </TableRow>
               </TableHeader>
+
               <TableBody>
-                {snapshot?.cells_V.map((cellV, index) => (
-                  <TableRow key={index}>
-                    <TableCell>{index + 1}</TableCell>
-                    <TableCell>{cellV}</TableCell>
+                {snapshot?.cells_V &&
+                  snapshot.cells_V.reduce<ReactElement[]>((rows, _, i, arr) => {
+                    if (i % 2 === 0) {
+                      const j = i + 1;
+                      rows.push(
+                        <TableRow key={i}>
+                          <TableCell>{i + 1}</TableCell>
+                          <TableCell>{arr[i]?.toFixed(3)}</TableCell>
+                          {j < arr.length ? (
+                            <>
+                              <TableCell>{j + 1}</TableCell>
+                              <TableCell>{arr[j]?.toFixed(3)}</TableCell>
+                            </>
+                          ) : (
+                            <>
+                              <TableCell />
+                              <TableCell />
+                            </>
+                          )}
+                        </TableRow>
+                      );
+                    }
+                    return rows;
+                  }, [])}
+
+                {(!snapshot?.cells_V || snapshot.cells_V.length === 0) && (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-muted-foreground">
+                      No cell data available
+                    </TableCell>
                   </TableRow>
-                ))}
+                )}
               </TableBody>
+
               <TableFooter>
                 <TableRow>
-                  <TableCell>Sum of cells (V): </TableCell>
-                  <TableCell>{snapshot?.packFromCells_V}</TableCell>
+                  <TableCell colSpan={3}>Sum of cells (V):</TableCell>
+                  <TableCell>{snapshot?.packFromCells_V?.toFixed(3)}</TableCell>
                 </TableRow>
               </TableFooter>
             </Table>
