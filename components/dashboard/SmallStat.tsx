@@ -5,7 +5,7 @@ const SmallStat: React.FC<{
   hint?: React.ReactNode;
 }> = ({ icon, label, value, hint }) => {
   return (
-    <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-md bg-card/40 border border-border">
+    <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-md bg-card/40">
       <div className="flex items-center gap-3 min-w-0">
         <div className="flex flex-col items-start truncate">
           <div className="text-sm font-semibold truncate">{value ?? "—"}</div>

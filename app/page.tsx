@@ -24,6 +24,7 @@ import { RangeSelector } from "@/components/dashboard/RangeSelector";
 import { SystemStateIcon } from "@/components/dashboard/SystemStateIcon";
 import { fmt } from "@/lib/utils/fmt";
 import SmallStat from "@/components/dashboard/SmallStat";
+import BatteryWithPercentage from "@/components/battery-with-percentage";
 
 export default function Page() {
   const {
@@ -155,81 +156,56 @@ export default function Page() {
               <div className="text-xs text-muted-foreground">Updated live</div>
             </CardHeader>
             <CardContent className="px-4 py-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <SmallStat
-                  label="Charge"
-                  value={
-                    snapshot?.soc_pct != null ? `${snapshot.soc_pct}%` : "—"
-                  }
-                  hint={
-                    snapshot?.remainCapacity_Ah
-                      ? `${snapshot.remainCapacity_Ah.toFixed(1)}Ah / ${
-                          snapshot?.ratedCapacity_Ah
-                        }`
-                      : undefined
-                  }
-                  icon={(() => {
-                    const raw = snapshot?.soc_pct;
-                    const pct =
-                      raw == null || Number.isNaN(Number(raw))
-                        ? null
-                        : Math.max(0, Math.min(100, Number(raw)));
-                    const fillColor =
-                      pct == null
-                        ? "#9ca3af"
-                        : pct > 60
-                        ? "#10b981"
-                        : pct > 30
-                        ? "#f59e0b"
-                        : "#ef4444";
-                    const angle = pct == null ? 0 : pct * 3.6;
-                    return (
-                      <div
-                        className="relative w-7 h-7 rounded-full grid place-items-center shrink-0"
-                        role="img"
-                        aria-label={
-                          pct == null
-                            ? "SOC unknown"
-                            : `State of charge ${Math.round(pct)} percent`
-                        }
-                        style={{
-                          background:
-                            pct == null
-                              ? "#e5e7eb"
-                              : `conic-gradient(${fillColor} ${angle}deg, #e5e7eb ${angle}deg)`,
-                        }}
-                      ></div>
-                    );
-                  })()}
-                />
-                <SmallStat
-                  icon={<PlugZap />}
-                  label="Power"
-                  value={
-                    snapshot?.voltage_V != null && snapshot?.current_A != null
-                      ? (() => {
-                          const power = snapshot.voltage_V * snapshot.current_A;
-                          const color =
-                            power > 0
-                              ? "text-green-600"
-                              : power < 0
-                              ? "text-red-600"
-                              : "text-gray-700";
-                          return (
-                            <span className={color}>{fmt(power, "W", 0)}</span>
-                          );
-                        })()
-                      : "—"
-                  }
-                  hint={
-                    snapshot?.voltage_V != null && snapshot?.current_A != null
-                      ? `${fmt(snapshot.voltage_V)}v × ${fmt(
-                          snapshot.current_A
-                        )}a`
-                      : undefined
-                  }
-                />
-
+              <div className="flex w-full justify-evenly mb-5">
+                <div className="flex flex-col items-center justify-between gap-2">
+                  <BatteryWithPercentage
+                    socPercentage={snapshot?.soc_pct ?? 70}
+                  />
+                  <Label className="text-muted-foreground">SoC</Label>
+                </div>
+                <div className="flex flex-col items-center justify-between gap-2">
+                  <div className="flex items-center h-14">
+                    <div className="font-semibold truncate">
+                      {snapshot?.voltage_V != null &&
+                      snapshot?.current_A != null
+                        ? (() => {
+                            const power =
+                              snapshot.voltage_V * snapshot.current_A;
+                            const color =
+                              power > 0
+                                ? "text-green-600"
+                                : power < 0
+                                ? "text-red-600"
+                                : "text-gray-700";
+                            return (
+                              <span className={color}>
+                                {fmt(power, "W", 0)}
+                              </span>
+                            );
+                          })()
+                        : "—"}
+                    </div>
+                  </div>
+                  <Label className="text-muted-foreground">Power (W)</Label>
+                </div>
+                <div className="flex flex-col items-center justify-between gap-2">
+                  <div className="flex items-center h-14">
+                    <div className="font-semibold truncate">
+                      {snapshot?.current_A?.toFixed(1) ?? "—"}
+                    </div>
+                  </div>
+                  <Label className="text-muted-foreground">Current (A)</Label>
+                </div>
+                <div className="flex flex-col items-center justify-between gap-2">
+                  <div className="flex items-center h-14">
+                    <div className="font-semibold truncate">
+                      {snapshot?.voltage_V ?? "—"}
+                    </div>
+                  </div>
+                  <Label className="text-muted-foreground">Voltage (V)</Label>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 border-t-2">
                 <SmallStat
                   icon={<Diff />}
                   label="Cells D"
