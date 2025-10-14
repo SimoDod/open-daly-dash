@@ -16,7 +16,6 @@ import {
   Plug,
   Battery as BatteryIcon,
   Diff,
-  Table,
 } from "lucide-react";
 
 import { useBmsDashboard } from "@/lib/hooks/useBmsDashboard";
@@ -27,13 +26,13 @@ import { fmt } from "@/lib/utils/fmt";
 import SmallStat from "@/components/dashboard/SmallStat";
 import BatteryWithPercentage from "@/components/battery-with-percentage";
 import {
-  TableCaption,
   TableHeader,
   TableRow,
   TableHead,
   TableBody,
   TableCell,
   TableFooter,
+  Table,
 } from "@/components/ui/table";
 
 export default function Page() {
@@ -256,9 +255,8 @@ export default function Page() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="px-4">
             <Table>
-              <TableCaption>A list of your recent invoices.</TableCaption>
               <TableHeader>
                 <TableRow>
                   <TableHead>Cell</TableHead>
@@ -268,15 +266,15 @@ export default function Page() {
               <TableBody>
                 {snapshot?.cells_V.map((cellV, index) => (
                   <TableRow key={index}>
-                    <TableCell className="font-medium">{index}</TableCell>
+                    <TableCell>{index + 1}</TableCell>
                     <TableCell>{cellV}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
               <TableFooter>
                 <TableRow>
-                  <TableCell colSpan={3}>Total</TableCell>
-                  <TableCell className="text-right">$2,500.00</TableCell>
+                  <TableCell>Sum of cells (V): </TableCell>
+                  <TableCell>{snapshot?.packFromCells_V}</TableCell>
                 </TableRow>
               </TableFooter>
             </Table>
