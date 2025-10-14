@@ -149,11 +149,11 @@ export default function Page() {
             </CardHeader>
             <CardContent className="px-4 py-4">
               <div className="flex w-full justify-evenly mb-5">
-                <div className="flex flex-col items-center justify-between gap-2">
+                <div className="flex flex-col items-center justify-between min-w-16">
                   <BatteryWithPercentage socPercentage={snapshot?.soc_pct} />
                   <Label className="text-muted-foreground">SoC (%)</Label>
                 </div>
-                <div className="flex flex-col items-center justify-between gap-2">
+                <div className="flex flex-col items-center justify-between min-w-16">
                   <div className="flex items-center h-14">
                     <div className="font-semibold truncate">
                       {snapshot?.voltage_V != null &&
@@ -178,7 +178,7 @@ export default function Page() {
                   </div>
                   <Label className="text-muted-foreground">Power</Label>
                 </div>
-                <div className="flex flex-col items-center justify-between gap-2">
+                <div className="flex flex-col items-center justify-between min-w-16">
                   <div className="flex items-center h-14">
                     <div className="font-semibold truncate">
                       {fmt(snapshot?.current_A, "A", 1)}
@@ -186,7 +186,7 @@ export default function Page() {
                   </div>
                   <Label className="text-muted-foreground">Current</Label>
                 </div>
-                <div className="flex flex-col items-center justify-between gap-2">
+                <div className="flex flex-col items-center justify-between min-w-16">
                   <div className="flex items-center h-14">
                     <div className="font-semibold truncate">
                       {fmt(snapshot?.voltage_V, "V", 1)}
