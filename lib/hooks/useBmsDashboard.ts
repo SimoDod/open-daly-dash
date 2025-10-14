@@ -241,6 +241,38 @@ export function useBmsDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pass]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handleVisible = () => {
+      if (!pass) return;
+
+      if (connected) return;
+
+      setConnecting(true);
+      setStatus("connecting");
+
+      if (
+        !evtRef.current ||
+        (evtRef.current && evtRef.current.readyState === 2)
+      ) {
+        connect();
+      }
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") handleVisible();
+    };
+
+    window.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("focus", handleVisible);
+
+    return () => {
+      window.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("focus", handleVisible);
+    };
+  }, [pass, connected, connect]);
+
   const cellDelta = useMemo(() => {
     if (snapshot?.cellMin_V == null || snapshot?.cellMax_V == null) return null;
     const minV = snapshot.cellMin_V;

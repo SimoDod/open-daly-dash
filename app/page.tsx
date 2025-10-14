@@ -195,7 +195,7 @@ export default function Page() {
                   <Label className="text-muted-foreground">Voltage</Label>
                 </div>
               </div>
-              <div className="flex gap-4  border-t-2 justify-evenly pt-2">
+              <div className="flex gap-4 border-t-2 justify-evenly pt-2 text-muted-foreground text-sm">
                 <div>Min: {fmt(snapshot?.cellMin_V, "V")}</div>
                 <div>Max: {fmt(snapshot?.cellMax_V, "V")}</div>
                 <div>
