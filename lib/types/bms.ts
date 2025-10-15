@@ -10,6 +10,10 @@ export type Snapshot = {
   remainCapacity_Ah?: number;
   system_state?: number | string;
   cells_V: number[];
+  charging: boolean;
+  discharging: boolean;
+  balancingActive: boolean;
+  balancingCells: unknown[];
 };
 
 export type DeviceInfo = {

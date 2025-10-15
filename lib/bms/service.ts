@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // cspell:words Uart
 import { EventEmitter } from "events";
 import { connectBleUart } from "./bleUart";
@@ -61,7 +62,6 @@ class BmsService extends EventEmitter {
   async ensureStarted() {
     if (this.started) return;
     this.started = true;
-    // Fire and forget the run loop; GET handler shouldn't block on BLE details
     void this.runLoop();
   }
 
@@ -106,7 +106,8 @@ class BmsService extends EventEmitter {
         const parser = new DalyParser(
           () => {},
           (d) => {
-            state.update(d);
+            // update state with any decoded frame including status_0x93 and balance_flags
+            state.update(d as any);
             this.lastSnapshot = state.snapshot();
 
             if (!this.ready) {

@@ -15,12 +15,16 @@ import {
   Zap,
   Plug,
   Battery as BatteryIcon,
+  Activity,
+  Battery,
+  BatteryCharging,
+  Loader2,
+  Thermometer,
 } from "lucide-react";
 
 import { useBmsDashboard } from "@/lib/hooks/useBmsDashboard";
 import { LiveChart } from "@/components/dashboard/LiveChart";
 import { RangeSelector } from "@/components/dashboard/RangeSelector";
-import { SystemStateIcon } from "@/components/dashboard/SystemStateIcon";
 import { fmt } from "@/lib/utils/fmt";
 import BatteryWithPercentage from "@/components/battery-with-percentage";
 import {
@@ -152,10 +156,10 @@ export default function Page() {
                               snapshot.voltage_V * snapshot.current_A;
                             const color =
                               power > 0
-                                ? "text-green-600"
+                                ? "text-green-500"
                                 : power < 0
-                                ? "text-red-600"
-                                : "text-gray-700";
+                                ? "text-red-500/90"
+                                : "text-base";
                             return (
                               <span className={color}>
                                 {fmt(power, "W", 0)}
@@ -186,7 +190,6 @@ export default function Page() {
               </div>
             </CardContent>
           </Card>
-
           <Card className="px-4">
             <Table>
               <TableHeader>
@@ -233,7 +236,7 @@ export default function Page() {
                 )}
               </TableBody>
 
-              <TableFooter>
+              <TableFooter className="bg-muted/25">
                 <TableRow>
                   <TableCell colSpan={3}>Sum of cells:</TableCell>
                   <TableCell>
@@ -250,7 +253,6 @@ export default function Page() {
               </TableFooter>
             </Table>
           </Card>
-
           {/* Live Telemetry: content first */}
           <Card>
             <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-4 py-2">
@@ -344,49 +346,87 @@ export default function Page() {
               )}
             </CardContent>
           </Card>
-
-          {/* Telemetry card: content first */}
           <Card>
             <CardHeader className="px-4 py-2">
               <CardTitle>Telemetry</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-center">
-                <div>
-                  <div className="text-sm text-muted-foreground">Temps</div>
-                  <div className="mt-1 font-medium">
-                    {snapshot?.temps_C?.length
-                      ? snapshot.temps_C.map((t: any) => `${t}°C`).join(", ")
-                      : "—"}
-                  </div>
-                </div>
+            <CardContent className="flex  flex-wrap gap-7">
+              {/* Temps */}
 
-                <div>
-                  <div className="text-sm text-muted-foreground">Device</div>
-                  <div className="mt-1 font-medium">
-                    {device ? `${device.name} • ${device.address}` : "—"}
-                  </div>
+              <div className="flex flex-col">
+                <div className="text-sm text-muted-foreground flex items-center gap-1">
+                  <Thermometer className="w-4 h-4" /> Temps
                 </div>
+                <div className="mt-1 font-medium">
+                  {snapshot?.temps_C?.length
+                    ? snapshot.temps_C.map((t: number) => `${t}°C`).join(", ")
+                    : "—"}
+                </div>
+              </div>
 
-                <div>
-                  <div className="text-sm text-muted-foreground">
-                    Connection
-                  </div>
-                  <div className="mt-1 font-medium">
-                    {connected
-                      ? "SSE Live"
-                      : connecting
-                      ? "Connecting..."
-                      : "Disconnected"}
-                  </div>
+              <div className="flex flex-col">
+                <div className="text-sm text-muted-foreground flex items-center gap-1">
+                  <Activity className="w-4 h-4" /> Connection
                 </div>
+                <div className="mt-1 font-medium">
+                  {connected
+                    ? "SSE Live"
+                    : connecting
+                    ? "Connecting..."
+                    : "Disconnected"}
+                </div>
+              </div>
+              {/* Connection */}
 
-                <div className="flex items-center gap-2">
-                  <div className="text-sm text-muted-foreground">System</div>
-                  <div aria-hidden>
-                    <SystemStateIcon state={snapshot?.system_state} />
-                  </div>
+              {/* Battery Status */}
+              <div className="flex flex-col">
+                <div className="text-sm text-muted-foreground flex items-center gap-1">
+                  <Battery className="w-4 h-4" /> Battery
                 </div>
+                <div className="mt-1 flex flex-col gap-2 ">
+                  <div
+                    className={`flex items-center gap-1 font-medium ${
+                      snapshot?.charging
+                        ? "text-green-500"
+                        : "text-muted-foreground"
+                    }`}
+                  >
+                    <BatteryCharging
+                      className={`w-4 h-4 ${
+                        snapshot?.charging ? "animate-pulse" : ""
+                      }`}
+                    />
+                    Charging {snapshot?.charging ? "Enabled" : "Disabled"}
+                  </div>
+                  <div
+                    className={`flex items-center gap-1 font-medium ${
+                      snapshot?.discharging
+                        ? "text-red-500/90"
+                        : "text-muted-foreground"
+                    }`}
+                  >
+                    <Zap
+                      className={`w-4 h-4 ${
+                        snapshot?.discharging ? "animate-pulse" : ""
+                      }`}
+                    />
+                    Discharging {snapshot?.discharging ? "Enabled" : "Disabled"}
+                  </div>
+                  {snapshot?.balancingActive ? (
+                    <div className="flex items-center gap-1 text-blue-600 font-medium">
+                      <Loader2 className="w-4 h-4 animate-spin" /> Balancing
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1 text-muted-foreground font-medium">
+                      <Loader2 className="w-4 h-4" /> Balance Idle
+                    </div>
+                  )}
+                </div>
+                {snapshot?.balancingCells?.length ? (
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    Balancing cells: {snapshot.balancingCells.join(", ")}
+                  </div>
+                ) : null}
               </div>
             </CardContent>
           </Card>

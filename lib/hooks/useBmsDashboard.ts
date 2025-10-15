@@ -93,7 +93,7 @@ export function useBmsDashboard() {
     if (readyStatePollRef.current) clearInterval(readyStatePollRef.current);
     readyStatePollRef.current = setInterval(() => {
       if (!evtRef.current) return;
-      const rs = evtRef.current.readyState; // 0 = connecting, 1 = open, 2 = closed
+      const rs = evtRef.current.readyState;
       if (rs === 0) {
         setConnecting(true);
         setConnected(false);

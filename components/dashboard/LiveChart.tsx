@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import React from "react";
@@ -30,60 +29,6 @@ const ResponsiveContainer = dynamic(
   () => import("recharts").then((m) => m.ResponsiveContainer),
   { ssr: false }
 );
-const Brush = dynamic(() => import("recharts").then((m) => m.Brush), {
-  ssr: false,
-});
-
-function formatTimestamp(ts: string | number): string {
-  let timestamp: number | Date;
-
-  if (typeof ts === "string") {
-    timestamp = new Date(ts); // Try direct parse for ISO or similar
-    if (!isNaN(timestamp.getTime())) {
-      return timestamp.toLocaleTimeString(); // Success: e.g., "2024-10-13T12:34:56"
-    }
-    // Fallback to numeric parse
-    const num = Number(ts);
-    if (isNaN(num)) {
-      return ts; // Completely invalid, show original
-    }
-    timestamp = num;
-  } else {
-    timestamp = ts; // Already a number
-  }
-
-  const numTs = Number(timestamp);
-  const digits = Math.floor(Math.log10(numTs) + 1);
-  const adjustedTs = digits <= 11 && digits >= 9 ? numTs * 1000 : numTs;
-
-  const date = new Date(adjustedTs);
-  if (isNaN(date.getTime())) {
-    return String(ts);
-  }
-  return date.toLocaleTimeString();
-}
-
-const CustomTooltip = ({ active, payload, label }: any) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-white p-2 border border-gray-300 rounded shadow">
-        <p className="font-bold">{formatTimestamp(label)}</p>
-        {payload.map((entry: any) => (
-          <p key={entry.name} style={{ color: entry.stroke }}>
-            {`${entry.name}: ${entry.value.toFixed(2)}${
-              entry.name.includes("SoC")
-                ? "%"
-                : entry.name.includes("Voltage")
-                ? "V"
-                : "A"
-            }`}
-          </p>
-        ))}
-      </div>
-    );
-  }
-  return null;
-};
 
 const LiveChartComponent = ({
   data,
@@ -123,9 +68,18 @@ const LiveChartComponent = ({
             <XAxis
               dataKey="ts"
               minTickGap={20}
-              tickFormatter={formatTimestamp}
+              tickFormatter={(ts: string) => {
+                const match = ts.match(/^(\d{1,2}):(\d{2}):\d{2} (\w{2})$/);
+                if (!match) return ts;
+                const [, hoursStr, minutes, period] = match;
+                let h = parseInt(hoursStr, 10);
+                if (period === "PM" && h < 12) h += 12;
+                if (period === "AM" && h === 12) h = 0;
+                return `${h.toString().padStart(2, "0")}:${minutes}`;
+              }}
               label={{ position: "insideBottom", offset: -5 }}
             />
+
             {showV && (
               <YAxis
                 yAxisId="voltage"
@@ -151,11 +105,9 @@ const LiveChartComponent = ({
               x={30}
               tickFormatter={(v: number) => `${v}%`}
             />
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip />
             <Legend layout="horizontal" verticalAlign="top" align="center" />
-            {data.length > 100 && (
-              <Brush dataKey="ts" height={20} stroke="#8884d8" />
-            )}
+
             {showV && (
               <Line
                 isAnimationActive={false}
@@ -165,7 +117,6 @@ const LiveChartComponent = ({
                 name="Voltage (V)"
                 dot={false}
                 stroke="#2563eb"
-                strokeWidth={2}
                 connectNulls={false}
               />
             )}
@@ -178,7 +129,6 @@ const LiveChartComponent = ({
                 name="Current (A)"
                 dot={false}
                 stroke="#059669"
-                strokeWidth={2}
                 connectNulls={false}
               />
             )}
@@ -191,7 +141,6 @@ const LiveChartComponent = ({
                 name="SoC (%)"
                 dot={false}
                 stroke="#f59e0b"
-                strokeWidth={2}
                 connectNulls={false}
               />
             )}

@@ -26,6 +26,7 @@ export function buildRequest(cmd: number) {
   return buf;
 }
 
+/* ----------------- Decoded union ----------------- */
 export type Decoded =
   | {
       type: "basic";
@@ -64,12 +65,144 @@ export type Decoded =
       cells_mV: number[];
       cells_V: number[];
       raw: string;
+    }
+  | {
+      type: "status_0x93";
+      cmd: number;
+      state: number;
+      chargeMos: number;
+      dischargeMos: number;
+      raw: string;
+    }
+  | {
+      type: "balance_flags";
+      cmd: number;
+      mask?: number | null;
+      perCell?: boolean[] | null;
+      raw: string;
     };
 
+/* ----------------- Frame type ----------------- */
 export type Frame = { src: number; cmd: number; len: number; data: Buffer };
+
+/* ----------------- Balancing detector ----------------- */
+
+/*
+  Deterministic BalancingDetector:
+  - preferred source: explicit flags (mask / perCell) via settings/status (not implemented here)
+  - fallback: trend-based detection using cell page samples
+  - suppress trend-detection when absolute pack current > currentSuppressThreshold_A
+*/
+type BalancingReport = {
+  balancing: boolean;
+  activeCells: number[]; // 0-based indices
+  reason: "flags" | "trend";
+  timestamp: number;
+};
+
+class BalancingDetector {
+  private history: Map<number, number[]> = new Map(); // idx -> recent mV samples
+  private maxSamples: number;
+  private dropThreshold_mV: number;
+  private topK: number;
+  private minSamplesToDecide: number;
+  private current_A: number = 0;
+  private currentSuppressThreshold_A: number;
+
+  constructor(opts?: {
+    maxSamples?: number;
+    dropThreshold_mV?: number;
+    topK?: number;
+    minSamplesToDecide?: number;
+    currentSuppressThreshold_A?: number;
+  }) {
+    this.maxSamples = opts?.maxSamples ?? 6;
+    this.dropThreshold_mV = opts?.dropThreshold_mV ?? 3;
+    this.topK = opts?.topK ?? 3;
+    this.minSamplesToDecide = opts?.minSamplesToDecide ?? 3;
+    this.currentSuppressThreshold_A = opts?.currentSuppressThreshold_A ?? 1; // suppress trend when |I| > 1A
+  }
+
+  setCurrent(current_A: number) {
+    this.current_A = current_A;
+  }
+
+  // Preferred path when device supplies explicit flags
+  detectFromFlags(mask?: number, perCell?: boolean[]): BalancingReport {
+    const activeCells: number[] = [];
+    if (Array.isArray(perCell) && perCell.length) {
+      perCell.forEach((v, i) => {
+        if (v) activeCells.push(i);
+      });
+    } else if (typeof mask === "number") {
+      for (let i = 0; i < 32; i++) {
+        if (mask & (1 << i)) activeCells.push(i);
+      }
+    }
+    return {
+      balancing: activeCells.length > 0,
+      activeCells,
+      reason: "flags",
+      timestamp: Date.now(),
+    };
+  }
+
+  // Feed a page of cells (page index, contiguous cells in that page)
+  feedCellPage(page: number, cells_mV: number[]): BalancingReport | null {
+    // Suppress trend-based detection when pack current is large
+    if (Math.abs(this.current_A) > this.currentSuppressThreshold_A) return null;
+
+    // Map page offset. Daly page sizing varies; assume 1 page = cells_mV.length
+    const pageBase = page * cells_mV.length;
+    for (let i = 0; i < cells_mV.length; i++) {
+      const idx = pageBase + i;
+      const arr = this.history.get(idx) ?? [];
+      arr.push(cells_mV[i]);
+      if (arr.length > this.maxSamples) arr.shift();
+      this.history.set(idx, arr);
+    }
+
+    // Require enough cells with enough samples
+    const deltas: { idx: number; delta: number; latest: number }[] = [];
+    for (const [idx, samples] of this.history.entries()) {
+      if (samples.length < this.minSamplesToDecide) continue;
+      const latest = samples[samples.length - 1];
+      const earliest = samples[0];
+      deltas.push({ idx, delta: latest - earliest, latest });
+    }
+
+    if (deltas.length === 0) return null;
+
+    // Take topK highest latest voltages as candidate balancing targets
+    deltas.sort((a, b) => b.latest - a.latest);
+    const top = deltas.slice(0, Math.min(this.topK, deltas.length));
+
+    // Identify cells among top whose delta indicates a drop (balancing bleed)
+    const balancingCells = top
+      .filter((t) => t.delta <= -Math.abs(this.dropThreshold_mV))
+      .map((t) => t.idx);
+
+    const balancing = balancingCells.length >= Math.ceil(top.length / 2);
+
+    return {
+      balancing,
+      activeCells: balancing ? balancingCells : [],
+      reason: "trend",
+      timestamp: Date.now(),
+    };
+  }
+
+  // Clear history (call on reconnect/resync)
+  reset() {
+    this.history.clear();
+  }
+}
+
+/* ----------------- DalyParser ----------------- */
 
 export class DalyParser {
   private buf: Buffer = Buffer.alloc(0);
+  private detector = new BalancingDetector();
   constructor(
     private onFrame: (f: Frame) => void,
     private onDecoded: (d: Decoded) => void
@@ -110,13 +243,52 @@ export class DalyParser {
 
       try {
         const d = decodeDaly(out);
-        if (d) this.onDecoded(d);
+        if (d) {
+          // propagate decoded frame
+          this.onDecoded(d);
+
+          // update detector with basic current frames
+          if (d.type === "basic") {
+            this.detector.setCurrent(d.current_A);
+          }
+
+          // feed cells into detector and emit balance_flags when available
+          if (d.type === "cells") {
+            const rep = this.detector.feedCellPage(d.page, d.cells_mV);
+            if (rep) {
+              const perCell: boolean[] = [];
+              for (const idx of rep.activeCells) perCell[idx] = true;
+              // normalize array: fill undefined -> false for contiguous indices
+              const maxIdx = rep.activeCells.length
+                ? Math.max(...rep.activeCells)
+                : -1;
+              if (maxIdx >= 0) {
+                for (let i = 0; i <= maxIdx; i++)
+                  if (!perCell[i]) perCell[i] = false;
+              }
+              // emit as Decoded balance_flags
+              this.onDecoded({
+                type: "balance_flags",
+                cmd: 0xff, // synthetic cmd for detector-originated event
+                mask: undefined,
+                perCell: perCell.length ? perCell : null,
+                raw: JSON.stringify({
+                  reason: rep.reason,
+                  timestamp: rep.timestamp,
+                  activeCells: rep.activeCells,
+                }),
+              });
+            }
+          }
+        }
       } catch {}
 
       this.buf = this.buf.slice(total);
     }
   }
 }
+
+/* ----------------- Decoding ----------------- */
 
 function decodeCurrentSmart(iRaw: number) {
   if (iRaw === 0x0000 || iRaw === 0xffff) return 0;
@@ -196,6 +368,22 @@ function decodeDaly(frame: Frame): Decoded | null {
     }
   }
 
+  if (cmd === 0x93 && data.length >= 4) {
+    const state = data[0];
+    const chargeMos = data[1];
+    const dischargeMos = data[2];
+
+    return {
+      type: "status_0x93",
+      cmd,
+      state,
+      chargeMos,
+      dischargeMos,
+
+      raw: data.toString("hex"),
+    };
+  }
+
   if (cmd === 0x94 && data.length >= 2) {
     const cells = data[0],
       ntc = data[1];
@@ -209,7 +397,8 @@ function decodeDaly(frame: Frame): Decoded | null {
       };
   }
 
-  if (cmd === 0x96 && data.length >= 2) {
+  if ((cmd === 0x96 || cmd === 0x92) && data.length >= 2) {
+    // some variants use 0x96, others 0x92
     const temps_C: number[] = [];
     for (let i = 1; i < data.length; i++) {
       const b = data[i];
@@ -245,5 +434,5 @@ function decodeDaly(frame: Frame): Decoded | null {
 }
 
 export function defaultPollSet() {
-  return [0x90, 0x91, 0x94, 0x96, 0x95].map(buildRequest);
+  return [0x90, 0x91, 0x93, 0x94, 0x96, 0x95].map(buildRequest);
 }

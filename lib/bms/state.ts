@@ -1,4 +1,5 @@
-// Aggregates decoded Daly messages into a single "state" snapshot.
+// state.ts - DalyState with status_0x93, balance_flags, and MOS fields
+
 type CapacityCandidates = { by0p01?: number; by0p1?: number };
 
 export class DalyState {
@@ -19,6 +20,15 @@ export class DalyState {
   cellMin_V?: number;
   cellMax_V?: number;
   cellDelta_V?: number;
+
+  balancingActive: boolean = false;
+  balancingCells: number[] = [];
+
+  // MOS / charge-discharge
+  chargeMos?: number | null; // raw byte(s) from 0x93
+  dischargeMos?: number | null; // raw byte(s) from 0x93
+  charging: boolean = false; // derived
+  discharging: boolean = false; // derived
 
   constructor(opts: { ratedAh?: number } = {}) {
     this.ratedAhCfg = Number.isFinite(opts.ratedAh)
@@ -43,26 +53,12 @@ export class DalyState {
     return best;
   }
 
-  update(decoded: {
-    type: "counts" | "basic" | "cell_stats" | "temps" | "cells";
-    cellCount?: number;
-    voltage_V?: number;
-    current_A?: number;
-    soc_pct?: number;
-    capacityField_Ah_candidates?: CapacityCandidates;
-    max_mV?: number;
-    max_V?: number;
-    min_mV?: number;
-    min_V?: number;
-    delta_mV?: number;
-    delta_V?: number;
-    temps_C?: number[];
-    page?: number;
-    cells_mV?: number[];
-  }) {
+  update(decoded: import("./daly").Decoded) {
     if (!decoded) return;
 
-    if (decoded.type === "counts") this.cellCount = decoded.cellCount;
+    if (decoded.type === "counts") {
+      this.cellCount = decoded.cellCount;
+    }
 
     if (decoded.type === "basic") {
       this.voltage_V = decoded.voltage_V;
@@ -129,6 +125,37 @@ export class DalyState {
         this.cellDelta_V = Number(((max - min) / 1000).toFixed(3));
       }
     }
+
+    // status_0x93 handler (cycles + remaining mAh + MOS bytes)
+    if (decoded.type === "status_0x93") {
+      // store raw MOS bytes
+      this.chargeMos = Number.isFinite(decoded.chargeMos as number)
+        ? (decoded.chargeMos as number)
+        : null;
+      this.dischargeMos = Number.isFinite(decoded.dischargeMos as number)
+        ? (decoded.dischargeMos as number)
+        : null;
+
+      this.charging = !!this.chargeMos && (this.chargeMos as number) !== 0;
+      this.discharging =
+        !!this.dischargeMos && (this.dischargeMos as number) !== 0;
+    }
+
+    // balance_flags handler (from detector or device)
+    if (decoded.type === "balance_flags") {
+      const activeCells: number[] = [];
+      if (Array.isArray(decoded.perCell) && decoded.perCell.length) {
+        for (let i = 0; i < decoded.perCell.length; i++) {
+          if (decoded.perCell[i]) activeCells.push(i);
+        }
+      } else if (typeof decoded.mask === "number") {
+        for (let i = 0; i < 32; i++) {
+          if (decoded.mask & (1 << i)) activeCells.push(i);
+        }
+      }
+      this.balancingActive = activeCells.length > 0;
+      this.balancingCells = activeCells;
+    }
   }
 
   snapshot() {
@@ -157,6 +184,12 @@ export class DalyState {
       cellMin_V: this.cellMin_V,
       cellMax_V: this.cellMax_V,
       cellDelta_V: this.cellDelta_V,
+      chargeMos: this.chargeMos ?? null,
+      dischargeMos: this.dischargeMos ?? null,
+      charging: this.charging,
+      discharging: this.discharging,
+      balancingActive: this.balancingActive,
+      balancingCells: this.balancingCells.slice(),
     };
   }
 }
