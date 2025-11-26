@@ -23,16 +23,16 @@ export default function BatteryReal({
 
   const getColorClass = (p: number | null) => {
     if (p == null) return "bg-gray-400";
-    if (p > 60) return "bg-green-500";
-    if (p > 30) return "bg-amber-500";
-    return "bg-red-500";
+    if (p > 60) return "bg-green-500/60";
+    if (p > 30) return "bg-amber-500/60";
+    return "bg-red-500/50";
   };
 
   const fillColor = getColorClass(pct);
 
   // proportions
   const height = Math.round(size * 0.42); // battery body height
-  const capWidth = Math.max(2, Math.round(size * 0.06));
+  const capWidth = Math.max(2, Math.round(size * 0.04));
 
   const ariaLabel =
     pct == null
@@ -74,8 +74,8 @@ export default function BatteryReal({
         {/* Percentage text */}
         {showLabel && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <span className="font-semibold leading-none text-foreground/90">
-              {pct == null ? "—" : `${Math.round(pct)}`}
+            <span className="font-semibold leading-none text-foreground">
+              {pct == null ? "—" : `${pct}`}
             </span>
           </div>
         )}
