@@ -64,7 +64,7 @@ export default function Page() {
   } = useBmsDashboard();
 
   return (
-    <div className="min-h-screen min-w-screen bg-background">
+    <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-20 bg-background/90 backdrop-blur border-b px-3">
         <div className="container flex items-center gap-3 py-3">
           <div className="flex items-center gap-3">
@@ -130,7 +130,7 @@ export default function Page() {
         </div>
       )}
 
-      <main className="min-w-screen container py-4">
+      <main className="min-w-screen container py-4 px-1">
         <div className="grid gap-4">
           <Card className="gap-0">
             <CardHeader className="px-4 py-2 flex items-center justify-between">
@@ -143,8 +143,11 @@ export default function Page() {
             <CardContent className="px-4 py-4">
               <div className="flex w-full justify-evenly mb-5">
                 <div className="flex flex-col items-center justify-between min-w-18 gap-1">
-                  <BatteryWithPercentage socPercentage={snapshot?.soc_pct} />
-                  <Label className="text-muted-foreground">SoC (%)</Label>
+                    <BatteryWithPercentage
+                      socPercentage={snapshot?.soc_pct}
+                      className=""
+                    />
+                    <Label className="text-muted-foreground">SoC (%)</Label>
                 </div>
                 <div className="flex flex-col items-center justify-between min-w-18 gap-1">
                   <div className="flex items-center h-14">

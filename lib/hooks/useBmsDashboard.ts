@@ -52,6 +52,11 @@ export function useBmsDashboard() {
     typeof navigator !== "undefined" ? navigator.onLine : true
   );
 
+  const pausedRef = useRef(false);
+  useEffect(() => {
+    pausedRef.current = paused;
+  }, [paused]);
+
   const scheduleFlush = useCallback(() => {
     if (flushTimerRef.current) return;
     flushTimerRef.current = setTimeout(() => {
@@ -146,7 +151,8 @@ export function useBmsDashboard() {
           case "state": {
             const s: Snapshot = evt.snapshot || {};
             setSnapshot(s);
-            if (!paused) {
+
+            if (!pausedRef.current) {
               const p: Point = {
                 ts: new Date().toLocaleTimeString(),
                 v: s.voltage_V,
@@ -154,9 +160,11 @@ export function useBmsDashboard() {
                 soc: s.soc_pct,
               };
               bufferRef.current.push(p);
+
               if (bufferRef.current.length > MAX_POINTS * 2) {
                 bufferRef.current = bufferRef.current.slice(-MAX_POINTS);
               }
+
               scheduleFlush();
             }
             break;
@@ -200,7 +208,7 @@ export function useBmsDashboard() {
         setLastError("Offline");
       }
     };
-  }, [pass, paused, scheduleFlush, isOnline, status]);
+  }, [pass, scheduleFlush, isOnline, status]);
 
   const disconnect = useCallback(() => {
     evtRef.current?.close();

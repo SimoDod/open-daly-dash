@@ -1,15 +1,17 @@
+"use client";
+
 import React from "react";
 
 type Props = {
   socPercentage?: number | null;
-  size?: number; // in px, default 56
+  size?: number; // width in px, default 48
   className?: string;
-  showLabel?: boolean; // show numeric text inside
+  showLabel?: boolean;
 };
 
-export default function BatteryWithPercentage({
+export default function BatteryReal({
   socPercentage,
-  size = 56,
+  size = 60,
   className = "",
   showLabel = true,
 }: Props) {
@@ -17,99 +19,76 @@ export default function BatteryWithPercentage({
   const pct =
     raw == null || Number.isNaN(raw) ? null : Math.max(0, Math.min(100, raw));
 
-  const getColor = (p: number | null) => {
-    if (p == null) return "#9ca3af"; // gray for unknown
-    if (p > 60) return "#10b981"; // green
-    if (p > 30) return "#f59e0b"; // amber
-    return "#ef4444"; // red
+  const level = pct == null ? 0 : pct;
+
+  const getColorClass = (p: number | null) => {
+    if (p == null) return "bg-gray-400";
+    if (p > 60) return "bg-green-500";
+    if (p > 30) return "bg-amber-500";
+    return "bg-red-500";
   };
 
-  const color = getColor(pct);
+  const fillColor = getColorClass(pct);
 
-  // SVG circle math: circumference = 2πr
-  // we'll make ring strokeWidth relative to size
-  const strokeWidth = Math.max(2, Math.round(size * 0.12));
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const progress = pct == null ? 0 : (pct / 100) * circumference;
+  // proportions
+  const height = Math.round(size * 0.42); // battery body height
+  const capWidth = Math.max(2, Math.round(size * 0.06));
+
+  const borderRadius = 4;
 
   const ariaLabel =
     pct == null
-      ? "State of charge unknown"
-      : `State of charge ${Math.round(pct)} percent`;
+      ? "Battery state unknown"
+      : `Battery ${Math.round(pct)} percent`;
 
   return (
     <div
       role="img"
       aria-label={ariaLabel}
-      style={{ width: size, height: size }}
-      className={`relative inline-grid place-items-center rounded-full ${className}`}
+      style={{ width: size, height }}
+      className={`relative flex items-center my-5 ${className}`}
     >
-      <svg
-        width={size}
-        height={size}
-        viewBox={`0 0 ${size} ${size}`}
-        aria-hidden
-        focusable={false}
+      {/* Battery body */}
+      <div
+        className={`relative flex-1 h-full rounded-[${borderRadius}px] border border-muted-foreground/30 bg-muted/10 overflow-hidden`}
+        style={{ marginRight: capWidth }}
       >
-        <defs>
-          <linearGradient id="batteryGradient" x1="0%" x2="100%">
-            <stop offset="0%" stopColor={color} stopOpacity="1" />
-            <stop offset="100%" stopColor={color} stopOpacity="0.9" />
-          </linearGradient>
-        </defs>
+        {/* Background track */}
+        <div className="absolute inset-0 bg-transparent" />
 
-        {/* background ring */}
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          stroke="#e5e7eb"
-          strokeWidth={strokeWidth}
-          fill="none"
+        {/* Fill */}
+        <div
+          className={`absolute left-0 top-0 bottom-0 ${fillColor}`}
+          style={{ width: `${level}%`, transition: "width 360ms ease" }}
         />
 
-        {/* progress ring */}
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          stroke="url(#batteryGradient)"
-          strokeWidth={strokeWidth}
-          strokeLinecap="round"
-          strokeDasharray={`${progress} ${Math.max(
-            1,
-            circumference - progress
-          )}`}
-          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        {/* Inner gloss / stripe for 'real' look */}
+        <div
+          aria-hidden
+          className="absolute left-0 top-0 bottom-0 pointer-events-none"
           style={{
-            transition: "stroke-dasharray 380ms ease, stroke 380ms ease",
+            background:
+              "linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.00))",
+            mixBlendMode: "overlay",
           }}
-          fill="none"
         />
 
-        {/* small inner circle for subtle inset */}
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={Math.max(2, radius - strokeWidth * 0.6)}
-          fill="#ffffff00"
-          stroke="transparent"
-        />
-      </svg>
+        {/* Percentage text */}
+        {showLabel && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <span className="text-[11px] font-semibold leading-none text-foreground/90">
+              {pct == null ? "—" : `${Math.round(pct)}%`}
+            </span>
+          </div>
+        )}
+      </div>
 
-      {showLabel && (
-        <div className="pointer-events-none absolute inset-0 grid place-items-center">
-          <span
-            className="leading-none text-sm font-bold"
-            style={{
-              color: pct == null ? "#6b7280" : color,
-            }}
-          >
-            {pct == null ? "—" : `${pct.toFixed(1)}`}
-          </span>
-        </div>
-      )}
+      {/* Battery cap */}
+      <div
+        aria-hidden
+        style={{ width: capWidth, height: Math.round(height * 0.62) }}
+        className="rounded-sm border border-muted-foreground/30 bg-muted/10"
+      />
     </div>
   );
 }
