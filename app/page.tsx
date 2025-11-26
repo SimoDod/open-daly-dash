@@ -145,7 +145,6 @@ export default function Page() {
                 <div className="flex flex-col items-center justify-between min-w-18 gap-1">
                     <BatteryWithPercentage
                       socPercentage={snapshot?.soc_pct}
-                      className=""
                     />
                     <Label className="text-muted-foreground">SoC (%)</Label>
                 </div>

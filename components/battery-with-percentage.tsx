@@ -46,7 +46,7 @@ export default function BatteryReal({
       role="img"
       aria-label={ariaLabel}
       style={{ width: size, height }}
-      className={`relative flex items-center my-5 ${className}`}
+      className={`relative flex items-center my-4 ${className}`}
     >
       {/* Battery body */}
       <div
@@ -76,8 +76,8 @@ export default function BatteryReal({
         {/* Percentage text */}
         {showLabel && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <span className="text-[11px] font-semibold leading-none text-foreground/90">
-              {pct == null ? "—" : `${Math.round(pct)}%`}
+            <span className="font-semibold leading-none text-foreground/90">
+              {pct == null ? "—" : `${Math.round(pct)}`}
             </span>
           </div>
         )}
