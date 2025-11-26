@@ -75,7 +75,7 @@ export default function BatteryReal({
         {showLabel && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <span className="font-semibold leading-none text-foreground">
-              {pct == null ? "—" : `${pct}`}
+              {pct == null ? "—" : `${Math.round(pct)}`}
             </span>
           </div>
         )}
