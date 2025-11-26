@@ -34,8 +34,6 @@ export default function BatteryReal({
   const height = Math.round(size * 0.42); // battery body height
   const capWidth = Math.max(2, Math.round(size * 0.06));
 
-  const borderRadius = 4;
-
   const ariaLabel =
     pct == null
       ? "Battery state unknown"
@@ -50,7 +48,7 @@ export default function BatteryReal({
     >
       {/* Battery body */}
       <div
-        className={`relative flex-1 h-full rounded-[${borderRadius}px] border border-muted-foreground/30 bg-muted/10 overflow-hidden`}
+        className={`relative flex-1 h-full rounded-[4px] border border-muted-foreground/30 bg-muted/10 overflow-hidden`}
         style={{ marginRight: capWidth }}
       >
         {/* Background track */}
