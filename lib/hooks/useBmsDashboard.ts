@@ -254,14 +254,6 @@ export function useBmsDashboard() {
         console.error("SSE parse error:", err);
       }
     };
-
-    es.onerror = () => {
-      toast.error("Event stream error – reconnecting...");
-      setBms((prev) => ({
-        1: { ...prev[1], connecting: true },
-        2: { ...prev[2], connecting: true },
-      }));
-    };
   }, [pass, isOnline, scheduleFlush]);
 
   const disconnect = useCallback(() => {
