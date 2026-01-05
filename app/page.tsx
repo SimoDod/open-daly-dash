@@ -141,7 +141,6 @@ export default function Page() {
                 setRange(r);
                 loadHistory(r, activeTab === "1" ? 1 : 2);
               }}
-              disabled={!isConnected}
             />
 
             <div className="flex gap-2">
