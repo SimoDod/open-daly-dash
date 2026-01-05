@@ -85,7 +85,7 @@ export default function Page() {
           onValueChange={(v) => setActiveTab(v as "1" | "2")}
           className="w-full"
         >
-          <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 my-6">
+          <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 my-1">
             <TabsTrigger value="1">BMS 1</TabsTrigger>
             <TabsTrigger value="2">BMS 2</TabsTrigger>
           </TabsList>
