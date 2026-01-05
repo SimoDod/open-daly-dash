@@ -31,75 +31,85 @@ export async function GET(req: NextRequest) {
 
   const stream = new ReadableStream({
     start(controller) {
-      const write = (obj: BmsEvent) => {
+      const write = (obj: any) => {
         controller.enqueue(`data: ${JSON.stringify(obj)}\n\n`);
       };
 
-      // initial hello
+      // Initial hello (kept for legacy clients)
       write({ ts: new Date().toISOString(), event: "hello" });
 
-      // seed current status
-      const isConnected = (svc as any).getIsConnected?.() ?? false;
-      const isReady = (svc as any).getIsReady?.() ?? false;
-      write({
-        ts: new Date().toISOString(),
-        event: isConnected
-          ? isReady
-            ? "ready"
-            : "connected"
-          : ("disconnected" as any),
+      // Send current status for BOTH BMS 1 and 2
+      ([1, 2] as const).forEach((id) => {
+        const connected = svc.getIsConnected(id);
+        const ready = svc.getIsReady(id);
+        const device = svc.getDeviceInfo(id);
+        const snapshot = svc.getLastSnapshot(id);
+
+        if (connected) {
+          write({
+            ts: new Date().toISOString(),
+            bmsId: id,
+            event: "connected",
+            device,
+          });
+
+          if (ready) {
+            write({
+              ts: new Date().toISOString(),
+              bmsId: id,
+              event: "ready",
+            });
+          }
+        } else {
+          write({
+            ts: new Date().toISOString(),
+            bmsId: id,
+            event: "disconnected",
+          });
+        }
+
+        if (snapshot) {
+          write({
+            ts: new Date().toISOString(),
+            bmsId: id,
+            event: "state",
+            snapshot,
+          });
+        }
       });
 
-      // send last known state if any
-      const snapshot = (svc as any).getLastSnapshot?.();
-      if (snapshot) {
-        write({
-          ts: new Date().toISOString(),
-          event: "state",
-          snapshot,
-        } as any);
-      }
-
+      // Event forwarder
       const onEvt = (evt: BmsEvent) => {
         if (debug) {
           write(evt);
           return;
         }
-        // Forward key events downstream for UI
+
+        // Forward relevant events (now with bmsId included)
         if (
-          evt?.event === "state" ||
-          evt?.event === "connected" ||
-          evt?.event === "ready" ||
-          evt?.event === "no_data" ||
-          evt?.event === "disconnected" ||
-          evt?.event === "tx_error"
+          evt.event === "state" ||
+          evt.event === "connected" ||
+          evt.event === "ready" ||
+          evt.event === "no_data" ||
+          evt.event === "disconnected" ||
+          evt.event === "tx_error"
         ) {
           write(evt);
         }
       };
 
-      // keepalive pings (some proxies need no-transform to avoid buffering)
-      const ping = setInterval(
-        () => controller.enqueue(`: keepalive\n\n`),
-        15000
-      );
+      // Keepalive pings every 15s
+      const ping = setInterval(() => {
+        controller.enqueue(`: keepalive\n\n`);
+      }, 45000);
 
-      // subscribe
-      const listener = (e: BmsEvent) => onEvt(e);
-      (
-        svc as unknown as {
-          on: (evt: string, fn: (e: BmsEvent) => void) => void;
-        }
-      ).on("evt", listener);
+      // Subscribe to all events
+      svc.on("evt", onEvt);
 
-      // teardown
+      // Cleanup on client disconnect
       const close = () => {
         clearInterval(ping);
-        (
-          svc as unknown as {
-            off: (evt: string, fn: (e: BmsEvent) => void) => void;
-          }
-        ).off("evt", listener);
+        svc.off("evt", onEvt);
         controller.close();
       };
 
@@ -113,8 +123,7 @@ export async function GET(req: NextRequest) {
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
       "Access-Control-Allow-Origin": "*",
-      // Helpful with some proxies that buffer
-      "X-Accel-Buffering": "no",
+      "X-Accel-Buffering": "no", // Important for nginx/proxy
     },
   });
 }

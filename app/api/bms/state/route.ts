@@ -1,3 +1,5 @@
+// app/api/bms/route.ts (or your current endpoint file)
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -26,17 +28,30 @@ export async function GET(req: NextRequest) {
   const svc = getBmsService();
   await svc.ensureStarted();
 
-  const snapshot = svc.getLastSnapshot();
-  const device = svc.getDeviceInfo();
-
-  return new Response(
-    JSON.stringify({ ts: new Date().toISOString(), device, snapshot }),
-    {
-      status: 200,
-      headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
+  // New: Return data for BOTH BMS 1 and BMS 2
+  const status = {
+    ts: new Date().toISOString(),
+    bms: {
+      1: {
+        connected: svc.getIsConnected(1),
+        ready: svc.getIsReady(1),
+        device: svc.getDeviceInfo(1),
+        snapshot: svc.getLastSnapshot(1),
       },
-    }
-  );
+      2: {
+        connected: svc.getIsConnected(2),
+        ready: svc.getIsReady(2),
+        device: svc.getDeviceInfo(2),
+        snapshot: svc.getLastSnapshot(2),
+      },
+    },
+  };
+
+  return new Response(JSON.stringify(status), {
+    status: 200,
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
 }

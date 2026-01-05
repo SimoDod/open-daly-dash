@@ -44,7 +44,7 @@ export default function BatteryReal({
       role="img"
       aria-label={ariaLabel}
       style={{ width: size, height }}
-      className={`relative flex items-center my-4 ${className}`}
+      className={`relative flex items-center my-1 ${className}`}
     >
       {/* Battery body */}
       <div

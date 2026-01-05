@@ -36,6 +36,7 @@ export async function dbConnect(): Promise<typeof mongoose> {
 const BmsSampleSchema = new Schema(
   {
     ts: { type: Date, required: true },
+    bmsId: { type: Number, required: true, enum: [1, 2] },
     snapshot: { type: Schema.Types.Mixed, required: true },
   },
   { collection: collName, versionKey: false }

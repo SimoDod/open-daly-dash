@@ -24,13 +24,13 @@ type Noble = typeof import("@abandonware/noble");
 let hciLoaded = false;
 async function ensureHciSocketLoaded() {
   if (hciLoaded) return;
-  hciLoaded = true; // prevent repeated attempts/log spam
+  hciLoaded = true;
 
   const isNode =
     typeof process !== "undefined" && !!(process as any).versions?.node;
-  if (!isNode) return; // browser/edge runtimes cannot load native modules
+  if (!isNode) return;
 
-  if (process.platform !== "linux") return; // macOS/Windows don't need HCI socket
+  if (process.platform !== "linux") return;
 
   const g: any = globalThis as any;
   if (g.BluetoothHciSocket) return;
@@ -72,28 +72,22 @@ async function getNoble(): Promise<Noble> {
   return nobleMod!;
 }
 
-// Correct UUIDs (32 hex chars, end with ...dcca9e):
-// - NUS Service: 6e400001-b5a3-f393-e0a9-e50e24dcca9e
-// - RX (write):  6e400002-b5a3-f393-e0a9-e50e24dcca9e
-// - TX (notify): 6e400003-b5a3-f393-e0a9-e50e24dcca9e
 const UUIDS = {
   HM10_SERVICE: "ffe0",
   HM10_CHAR: "ffe1",
 
   NUS_SERVICE: "6e400001b5a3f393e0a9e50e24dcca9e",
-  NUS_RX: "6e400002b5a3f393e0a9e50e24dcca9e", // write
-  NUS_TX: "6e400003b5a3f393e0a9e50e24dcca9e", // notify
+  NUS_RX: "6e400002b5a3f393e0a9e50e24dcca9e",
+  NUS_TX: "6e400003b5a3f393e0a9e50e24dcca9e",
 
   FFF0_SERVICE: "fff0",
-  FFF1: "fff1", // often notify
-  FFF2: "fff2", // often write
+  FFF1: "fff1",
+  FFF2: "fff2",
 };
 
-// On macOS, CoreBluetooth prefers dashed 128-bit UUIDs.
-// Convert a 32-hex string to 8-4-4-4-12 dashed form.
 function dash128(hex32: string) {
   const h = hex32.replace(/-/g, "").toLowerCase();
-  if (h.length !== 32) return hex32; // fall back if not 32 hex chars
+  if (h.length !== 32) return hex32;
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(
     16,
     20
@@ -101,7 +95,7 @@ function dash128(hex32: string) {
 }
 
 function platformUuid(u: string) {
-  if (u.length <= 6) return u.toLowerCase(); // keep 16-bit short UUIDs as-is
+  if (u.length <= 6) return u.toLowerCase();
   return process.platform === "darwin" ? dash128(u) : u.toLowerCase();
 }
 
@@ -121,7 +115,6 @@ function matchesTarget(
 }
 
 async function discoverUart(peripheral: any) {
-  // HM-10 FFE1
   try {
     const { characteristics } =
       await peripheral.discoverSomeServicesAndCharacteristicsAsync(
@@ -138,7 +131,6 @@ async function discoverUart(peripheral: any) {
     }
   } catch {}
 
-  // Nordic NUS
   try {
     const { characteristics } =
       await peripheral.discoverSomeServicesAndCharacteristicsAsync(
@@ -159,7 +151,6 @@ async function discoverUart(peripheral: any) {
     }
   } catch {}
 
-  // Generic FFF0/1/2
   try {
     const { characteristics } =
       await peripheral.discoverSomeServicesAndCharacteristicsAsync(
@@ -189,7 +180,6 @@ async function discoverUart(peripheral: any) {
     }
   } catch {}
 
-  // Fallback: any service with notify+write
   const services = await peripheral.discoverServicesAsync([]);
   for (const s of services) {
     const characteristics = await s.discoverCharacteristicsAsync([]);
@@ -216,7 +206,6 @@ async function discoverUart(peripheral: any) {
 
 async function waitForPoweredOn() {
   const noble = await getNoble();
-  // Runtime exposes "state"
   const currentState = (noble as any).state ?? (noble as any)._state;
   if (currentState === "poweredOn") return;
   await new Promise<void>((resolve, reject) => {
@@ -233,46 +222,51 @@ async function waitForPoweredOn() {
   });
 }
 
-export async function connectBleUart({
+export async function connectBleUart(
   addr = "",
-  namePart = "",
-}: {
-  addr?: string;
-  namePart?: string;
-}): Promise<BleUartConnection> {
+  namePart = ""
+): Promise<BleUartConnection> {
   const noble = await getNoble();
 
   await waitForPoweredOn();
+
+  // Start scanning
   await (noble as any).startScanningAsync([], true);
 
-  const periph = await new Promise<any>((resolve, reject) => {
-    const onDiscover = (p: any) => {
-      if (
-        matchesTarget(p, {
-          addr: addr.toLowerCase(),
-          namePart: namePart.toLowerCase(),
-        })
-      ) {
-        clearTimeout(timer);
+  let periph: any;
+
+  try {
+    periph = await new Promise<any>((resolve, reject) => {
+      const onDiscover = (p: any) => {
+        if (
+          matchesTarget(p, {
+            addr: addr.toLowerCase(),
+            namePart: namePart.toLowerCase(),
+          })
+        ) {
+          clearTimeout(timer);
+          (noble as any).removeListener("discover", onDiscover as any);
+          resolve(p);
+        }
+      };
+      const timer = setTimeout(() => {
         (noble as any).removeListener("discover", onDiscover as any);
-        resolve(p);
-      }
-    };
-    const timer = setTimeout(() => {
-      (noble as any).removeListener("discover", onDiscover as any);
-      reject(
-        new Error(
-          "Target not found while scanning. Check ADDR/NAME and device advertising."
-        )
-      );
-    }, 30000);
-    (noble as any).on("discover", onDiscover as any);
-  }).finally(async () => {
+        reject(
+          new Error(
+            "Target not found while scanning. Check ADDR/NAME and device advertising."
+          )
+        );
+      }, 45000); // Increased from 30s to 45s for reliability
+      (noble as any).on("discover", onDiscover as any);
+    });
+  } finally {
+    // ALWAYS stop scanning after discovery (even on timeout)
     try {
       await (noble as any).stopScanningAsync();
     } catch {}
-  });
+  }
 
+  // Now safe to connect (scan is stopped)
   await periph.connectAsync();
   const io = await discoverUart(periph);
 
