@@ -154,10 +154,6 @@ export function useBmsDashboard() {
       }
     }, 800);
 
-    es.onopen = () => {
-      toast.success("Connected to BMS stream");
-    };
-
     es.onmessage = (msg) => {
       if (msg.data.startsWith(":")) return; // keepalive
 

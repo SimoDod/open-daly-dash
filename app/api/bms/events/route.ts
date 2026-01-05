@@ -29,16 +29,20 @@ export async function GET(req: NextRequest) {
 
   const debug = req.nextUrl.searchParams.get("debug") === "1";
 
+  // Throttle state updates per BMS (max once every 2 seconds)
+  const lastStateSent = { 1: 0, 2: 0 };
+  const STATE_THROTTLE_MS = 2000;
+
   const stream = new ReadableStream({
     start(controller) {
       const write = (obj: any) => {
         controller.enqueue(`data: ${JSON.stringify(obj)}\n\n`);
       };
 
-      // Initial hello (kept for legacy clients)
+      // Initial greeting
       write({ ts: new Date().toISOString(), event: "hello" });
 
-      // Send current status for BOTH BMS 1 and 2
+      // Send current status once at connect
       ([1, 2] as const).forEach((id) => {
         const connected = svc.getIsConnected(id);
         const ready = svc.getIsReady(id);
@@ -50,7 +54,7 @@ export async function GET(req: NextRequest) {
             ts: new Date().toISOString(),
             bmsId: id,
             event: "connected",
-            device,
+            device: device ?? undefined,
           });
 
           if (ready) {
@@ -75,38 +79,50 @@ export async function GET(req: NextRequest) {
             event: "state",
             snapshot,
           });
+          lastStateSent[id] = Date.now();
         }
       });
 
-      // Event forwarder
       const onEvt = (evt: BmsEvent) => {
         if (debug) {
           write(evt);
           return;
         }
 
-        // Forward relevant events (now with bmsId included)
+        const now = Date.now();
+
+        // Always forward critical status changes
         if (
-          evt.event === "state" ||
           evt.event === "connected" ||
           evt.event === "ready" ||
-          evt.event === "no_data" ||
           evt.event === "disconnected" ||
+          evt.event === "no_data" ||
           evt.event === "tx_error"
         ) {
           write(evt);
+          return;
         }
+
+        // Throttle "state" updates — only send if >2s since last one per BMS
+        if (evt.event === "state") {
+          if (now - lastStateSent[evt.bmsId] >= STATE_THROTTLE_MS) {
+            write(evt);
+            lastStateSent[evt.bmsId] = now;
+          }
+          // Otherwise drop — UI already has recent data
+          return;
+        }
+
+        // Drop everything else (tx, decoded, etc.)
       };
 
-      // Keepalive pings every 15s
+      // Longer keepalive — reduces noise
       const ping = setInterval(() => {
-        controller.enqueue(`: keepalive\n\n`);
-      }, 45000);
+        controller.enqueue(`: ping\n\n`);
+      }, 30000); // 30s
 
-      // Subscribe to all events
       svc.on("evt", onEvt);
 
-      // Cleanup on client disconnect
       const close = () => {
         clearInterval(ping);
         svc.off("evt", onEvt);
@@ -123,7 +139,7 @@ export async function GET(req: NextRequest) {
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
       "Access-Control-Allow-Origin": "*",
-      "X-Accel-Buffering": "no", // Important for nginx/proxy
+      "X-Accel-Buffering": "no",
     },
   });
 }

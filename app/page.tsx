@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { PlugZap } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { motion, AnimatePresence } from "framer-motion";
 
 import { useBmsDashboard } from "@/lib/hooks/useBmsDashboard";
 import { BmsTabContent } from "@/components/dashboard/BmsTabContent";
@@ -84,87 +85,109 @@ export default function Page() {
           onValueChange={(v) => setActiveTab(v as "1" | "2")}
           className="w-full"
         >
-          <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 my-2">
+          <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 my-6">
             <TabsTrigger value="1">BMS 1</TabsTrigger>
             <TabsTrigger value="2">BMS 2</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="1" className="mt-0">
-            <BmsTabContent
-              bmsId={1}
-              snapshot={bms[1].snapshot}
-              device={bms[1].device}
-              chartData={bms[1].chartData}
-              showV={showV}
-              showI={showI}
-              showSoc={showSoc}
-              cellDelta={cellDeltas[1]}
-              connecting={bms[1].connecting}
-              connected={bms[1].connected}
-            />
-          </TabsContent>
+          {/* Animated Tab Content */}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{
+                duration: 0.4,
+                ease: "easeOut",
+              }}
+              className="mt-4"
+            >
+              {activeTab === "1" ? (
+                <BmsTabContent
+                  bmsId={1}
+                  snapshot={bms[1].snapshot}
+                  device={bms[1].device}
+                  chartData={bms[1].chartData}
+                  showV={showV}
+                  showI={showI}
+                  showSoc={showSoc}
+                  cellDelta={cellDeltas[1]}
+                  connecting={bms[1].connecting}
+                  connected={bms[1].connected}
+                />
+              ) : (
+                <BmsTabContent
+                  bmsId={2}
+                  snapshot={bms[2].snapshot}
+                  device={bms[2].device}
+                  chartData={bms[2].chartData}
+                  showV={showV}
+                  showI={showI}
+                  showSoc={showSoc}
+                  cellDelta={cellDeltas[2]}
+                  connecting={bms[2].connecting}
+                  connected={bms[2].connected}
+                />
+              )}
+            </motion.div>
+          </AnimatePresence>
 
-          <TabsContent value="2" className="mt-0">
-            <BmsTabContent
-              bmsId={2}
-              snapshot={bms[2].snapshot}
-              device={bms[2].device}
-              chartData={bms[2].chartData}
-              showV={showV}
-              showI={showI}
-              showSoc={showSoc}
-              cellDelta={cellDeltas[2]}
-              connecting={bms[2].connecting}
-              connected={bms[2].connected}
+          {/* Controls below tabs */}
+          <div className="flex flex-wrap items-center justify-center gap-4 my-8">
+            <RangeSelector
+              value={range}
+              onChange={(r) => {
+                setRange(r);
+                loadHistory(r, activeTab === "1" ? 1 : 2);
+              }}
+              disabled={!isConnected}
             />
-          </TabsContent>
-        </Tabs>
-        <div className="flex items-center justify-center gap-4 my-4">
-          <RangeSelector
-            value={range}
-            onChange={(r) => {
-              setRange(r);
-              loadHistory(r, activeTab === "1" ? 1 : 2);
-            }}
-          />
 
-          <div className="flex gap-2">
-            <button
-              onClick={() => setShowV((s) => !s)}
-              className={`p-2 rounded-md border ${
-                showV ? "bg-foreground/10" : "bg-muted/5"
-              }`}
-              disabled={!isConnected}
-            >
-              <span className="text-xs">V</span>
-            </button>
-            <button
-              onClick={() => setShowI((s) => !s)}
-              className={`p-2 rounded-md border ${
-                showI ? "bg-foreground/10" : "bg-muted/5"
-              }`}
-              disabled={!isConnected}
-            >
-              <span className="text-xs">I</span>
-            </button>
-            <button
-              onClick={() => setShowSoc((s) => !s)}
-              className={`p-2 rounded-md border ${
-                showSoc ? "bg-foreground/10" : "bg-muted/5"
-              }`}
-              disabled={!isConnected}
-            >
-              <span className="text-xs">SoC</span>
-            </button>
-            <button
-              onClick={togglePause}
-              className="p-2 rounded-md border bg-muted/5"
-              disabled={!isConnected}
-            >
-              {paused ? "▶" : "⏸"}
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowV((s) => !s)}
+                className={`p-3 rounded-lg border transition-all ${
+                  showV
+                    ? "bg-primary/10 text-primary border-primary/50"
+                    : "bg-muted/5 border-muted"
+                }`}
+                disabled={!isConnected}
+              >
+                <span className="font-medium">V</span>
+              </button>
+              <button
+                onClick={() => setShowI((s) => !s)}
+                className={`p-3 rounded-lg border transition-all ${
+                  showI
+                    ? "bg-primary/10 text-primary border-primary/50"
+                    : "bg-muted/5 border-muted"
+                }`}
+                disabled={!isConnected}
+              >
+                <span className="font-medium">I</span>
+              </button>
+              <button
+                onClick={() => setShowSoc((s) => !s)}
+                className={`p-3 rounded-lg border transition-all ${
+                  showSoc
+                    ? "bg-primary/10 text-primary border-primary/50"
+                    : "bg-muted/5 border-muted"
+                }`}
+                disabled={!isConnected}
+              >
+                <span className="font-medium">SoC</span>
+              </button>
+              <button
+                onClick={togglePause}
+                className="p-3 rounded-lg border bg-muted/10"
+                disabled={!isConnected}
+              >
+                {paused ? "▶" : "⏸"}
+              </button>
+            </div>
           </div>
-        </div>
+        </Tabs>
       </main>
     </div>
   );

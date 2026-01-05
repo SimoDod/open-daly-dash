@@ -10,28 +10,6 @@ import { getBmsSampleModel } from "../db/mongoose";
 
 export type BmsSnapshot = ReturnType<DalyState["snapshot"]>;
 
-export type BmsEvent =
-  | { ts: string; bmsId: 1 | 2; event: "connecting" }
-  | {
-      ts: string;
-      bmsId: 1 | 2;
-      event: "connected";
-      device: BleUartConnection["deviceInfo"];
-    }
-  | { ts: string; bmsId: 1 | 2; event: "ready" }
-  | { ts: string; bmsId: 1 | 2; event: "no_data"; for_ms: number }
-  | { ts: string; bmsId: 1 | 2; event: "disconnected"; reason?: string }
-  | { ts: string; bmsId: 1 | 2; event: "state"; snapshot: BmsSnapshot }
-  | { ts: string; bmsId: 1 | 2; event: "tx"; hex: string }
-  | { ts: string; bmsId: 1 | 2; event: "tx_error"; message: string }
-  | {
-      ts: string;
-      bmsId: 1 | 2;
-      event: "decoded";
-      data: import("./daly").Decoded;
-    };
-
-// Add this type near the top, right after BmsEvent
 type BmsEventPayload =
   | { event: "connecting" }
   | { event: "connected"; device: BleUartConnection["deviceInfo"] }
@@ -43,20 +21,20 @@ type BmsEventPayload =
   | { event: "tx_error"; message: string }
   | { event: "decoded"; data: import("./daly").Decoded };
 
-const POLL_MS = parseInt(process.env.POLL_MS || "6000", 10);
+export type BmsEvent = BmsEventPayload & { ts: string; bmsId: 1 | 2 };
+
+const POLL_MS = parseInt(process.env.POLL_MS || "10000", 10); // Increased to 10s to reduce bursts
 const SAMPLE_EVERY_MS = parseInt(process.env.SAMPLE_EVERY_MS || "15000", 10);
-const RX_TIMEOUT_MS = parseInt(process.env.RX_TIMEOUT_MS || "15000", 10);
+const RX_TIMEOUT_MS = parseInt(process.env.RX_TIMEOUT_MS || "60000", 10); // 60s
 const CONNECT_TIMEOUT_MS = parseInt(
   process.env.CONNECT_TIMEOUT_MS || "60000",
   10
-);
+); // Increased to 60s
 
-// BMS 1
 const RATED_AH1 = Number(process.env.RATED_AH1);
 const TARGET_ADDR1 = (process.env.ADDR1 || "").toLowerCase();
 const TARGET_NAME1 = (process.env.NAME1 || "").toLowerCase();
 
-// BMS 2
 const RATED_AH2 = Number(process.env.RATED_AH2);
 const TARGET_ADDR2 = (process.env.ADDR2 || "").toLowerCase();
 const TARGET_NAME2 = (process.env.NAME2 || "").toLowerCase();
@@ -134,7 +112,6 @@ class BmsService extends EventEmitter {
     });
   }
 
-  // === Public getters for API ===
   getLastSnapshot(id: 1 | 2): BmsSnapshot | null {
     const snapshot = this.getContext(id).state.snapshot();
     return Object.keys(snapshot).length > 0 ? snapshot : null;
@@ -152,7 +129,6 @@ class BmsService extends EventEmitter {
     return this.getContext(id).ready;
   }
 
-  // New: Get full status for both BMS
   getStatus() {
     return {
       ts: new Date().toISOString(),
@@ -179,36 +155,6 @@ class BmsService extends EventEmitter {
     void this.runLoop();
   }
 
-  private async connectOne(id: 1 | 2): Promise<BleUartConnection | null> {
-    const addr = id === 1 ? TARGET_ADDR1 : TARGET_ADDR2;
-    const namePart = id === 1 ? TARGET_NAME1 : TARGET_NAME2;
-
-    if (!addr && !namePart) {
-      this.emitEvent(id, {
-        event: "disconnected",
-        reason: "No ADDR or NAME configured",
-      });
-      return null;
-    }
-
-    try {
-      const conn = await this.withTimeout(
-        connectBleUart(addr || undefined, namePart || undefined),
-        CONNECT_TIMEOUT_MS,
-        `BLE connect timeout for BMS ${id}`
-      );
-
-      this.emitEvent(id, { event: "connected", device: conn.deviceInfo });
-      return conn;
-    } catch (e) {
-      this.emitEvent(id, {
-        event: "disconnected",
-        reason: e instanceof Error ? e.message : String(e),
-      });
-      return null;
-    }
-  }
-
   private async runLoop() {
     let backoffMs = 1000;
 
@@ -218,14 +164,12 @@ class BmsService extends EventEmitter {
 
       let connectedAny = false;
 
-      // Connect BMS 1
       const conn1 = await this.connectOne(1);
       if (conn1) {
         await this.setupContext(this.ctx1, conn1);
         connectedAny = true;
       }
 
-      // Connect BMS 2
       const conn2 = await this.connectOne(2);
       if (conn2) {
         await this.setupContext(this.ctx2, conn2);
@@ -234,7 +178,6 @@ class BmsService extends EventEmitter {
 
       if (connectedAny) backoffMs = 1000;
 
-      // Wait for both to disconnect before retrying
       if (this.getIsConnected(1) || this.getIsConnected(2)) {
         await new Promise<void>((resolve) => {
           const check = () => {
@@ -243,12 +186,10 @@ class BmsService extends EventEmitter {
               resolve();
             }
           };
-          const handler = (evt: BmsEvent) => {
-            if (evt.event === "disconnected") check();
-          };
+          const handler = (evt: BmsEvent) =>
+            evt.event === "disconnected" && check();
           this.on("evt", handler);
           check();
-
           setTimeout(() => {
             this.off("evt", handler);
             resolve();
@@ -256,7 +197,6 @@ class BmsService extends EventEmitter {
         });
       }
 
-      // Cleanup on failure
       if (!connectedAny) {
         this.cleanupContext(this.ctx1);
         this.cleanupContext(this.ctx2);
@@ -269,9 +209,7 @@ class BmsService extends EventEmitter {
     }
   }
 
-  private async connectOneWithSharedScan(
-    id: 1 | 2
-  ): Promise<BleUartConnection | null> {
+  private async connectOne(id: 1 | 2): Promise<BleUartConnection | null> {
     const addr = id === 1 ? TARGET_ADDR1 : TARGET_ADDR2;
     const namePart = id === 1 ? TARGET_NAME1 : TARGET_NAME2;
 
@@ -283,22 +221,31 @@ class BmsService extends EventEmitter {
       return null;
     }
 
-    try {
-      const conn = await this.withTimeout(
-        connectBleUart(addr || undefined, namePart || undefined),
-        CONNECT_TIMEOUT_MS,
-        `BLE connect timeout for BMS ${id}`
-      );
+    // Retry loop for timeouts
+    let retryDelay = 2000;
+    while (!this.stopping) {
+      try {
+        const conn = await this.withTimeout(
+          connectBleUart(addr || undefined, namePart || undefined),
+          CONNECT_TIMEOUT_MS,
+          `BLE connect timeout for BMS ${id}`
+        );
+        this.emitEvent(id, { event: "connected", device: conn.deviceInfo });
+        return conn;
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        if (message.includes("BLE connect timeout")) {
+          // Silent retry
+          await new Promise((r) => setTimeout(r, retryDelay));
+          retryDelay = Math.min(retryDelay * 1.5, 15000); // gentle backoff
+          continue;
+        }
 
-      this.emitEvent(id, { event: "connected", device: conn.deviceInfo });
-      return conn;
-    } catch (e) {
-      this.emitEvent(id, {
-        event: "disconnected",
-        reason: e instanceof Error ? e.message : String(e),
-      });
-      return null;
+        this.emitEvent(id, { event: "disconnected", reason: message });
+        return null;
+      }
     }
+    return null;
   }
 
   private async setupContext(ctx: BmsContext, conn: BleUartConnection) {
@@ -311,11 +258,21 @@ class BmsService extends EventEmitter {
     });
 
     conn.onDisconnect(() => {
+      console.log(`BMS ${ctx.id}: connection lost`);
       this.emitEvent(ctx.id, {
         event: "disconnected",
-        reason: "BLE device disconnected",
+        reason: "Connection lost",
       });
       this.cleanupContext(ctx);
+
+      if (!this.stopping) {
+        const retryDelay = 2000 + Math.random() * 2000; // jitter 2-4s
+        setTimeout(async () => {
+          if (this.stopping) return;
+          const newConn = await this.connectOne(ctx.id);
+          if (newConn) await this.setupContext(ctx, newConn);
+        }, retryDelay);
+      }
     });
 
     const frames = defaultPollSet();
@@ -324,7 +281,7 @@ class BmsService extends EventEmitter {
         try {
           await conn.write(frame);
           this.emitEvent(ctx.id, { event: "tx", hex: frame.toString("hex") });
-          await new Promise((r) => setTimeout(r, 120));
+          await new Promise((r) => setTimeout(r, 300)); // Increased delay to reduce burst
         } catch (e) {
           this.emitEvent(ctx.id, {
             event: "tx_error",
@@ -341,7 +298,7 @@ class BmsService extends EventEmitter {
       const idle = Date.now() - ctx.lastRx;
       if (idle >= RX_TIMEOUT_MS) {
         this.emitEvent(ctx.id, { event: "no_data", for_ms: idle });
-        conn.disconnect().catch(() => {});
+        ctx.lastRx = Date.now(); // reset to avoid spam
       }
     }, Math.max(1000, Math.floor(RX_TIMEOUT_MS / 3)));
 

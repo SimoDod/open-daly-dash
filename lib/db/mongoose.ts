@@ -23,7 +23,6 @@ export async function dbConnect(): Promise<typeof mongoose> {
     if (!uri) throw new Error("MONGODB_URI not set");
     global.__mongoose!.promise = mongoose.connect(uri, {
       dbName,
-      // autoIndex is convenient in dev; tune for prod if needed
       autoIndex: true,
     });
   }
@@ -31,8 +30,7 @@ export async function dbConnect(): Promise<typeof mongoose> {
   return global.__mongoose!.conn;
 }
 
-// Define schema WITHOUT index:true on fields to avoid duplicate index warnings.
-// We'll declare a single index via schema.index() below (TTL or normal).
+// Schema with bmsId
 const BmsSampleSchema = new Schema(
   {
     ts: { type: Date, required: true },
@@ -42,18 +40,17 @@ const BmsSampleSchema = new Schema(
   { collection: collName, versionKey: false }
 );
 
-// One and only one index on ts:
-// - If RETENTION_DAYS set: TTL index
-// - Else: normal ascending index
-const days = Number(process.env.RETENTION_DAYS || "");
-if (Number.isFinite(days) && days > 0) {
-  BmsSampleSchema.index(
-    { ts: 1 },
-    { expireAfterSeconds: Math.round(days * 86400) }
-  );
-} else {
-  BmsSampleSchema.index({ ts: 1 });
-}
+// TTL Index: Automatically delete documents 7 days after 'ts'
+BmsSampleSchema.index(
+  { ts: 1 },
+  { expireAfterSeconds: 604800 } // 7 days = 7 * 24 * 60 * 60 = 604800 seconds
+);
+
+// Compound index for efficient queries: latest samples per BMS
+BmsSampleSchema.index({ bmsId: 1, ts: -1 });
+
+// Optional: regular index on ts for general sorting
+BmsSampleSchema.index({ ts: 1 });
 
 type BmsSampleDoc = InferSchemaType<typeof BmsSampleSchema>;
 let BmsSampleModel: Model<BmsSampleDoc> | null = null;
