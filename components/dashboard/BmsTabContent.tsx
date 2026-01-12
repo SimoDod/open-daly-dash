@@ -1,4 +1,3 @@
-// components/dashboard/BmsTabContent.tsx
 import React from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
@@ -17,11 +16,19 @@ import {
   BatteryCharging,
   Loader2,
   Zap,
+  WifiOff,
 } from "lucide-react";
 import BatteryWithPercentage from "@/components/battery-with-percentage";
 import { LiveChart } from "@/components/dashboard/LiveChart";
 import { fmt } from "@/lib/utils/fmt";
 import type { Point, Snapshot } from "@/lib/types/bms";
+
+type ConnectionState =
+  | "connecting"
+  | "connected"
+  | "ready"
+  | "degraded"
+  | "disconnected";
 
 type BmsTabContentProps = {
   bmsId: 1 | 2;
@@ -34,6 +41,7 @@ type BmsTabContentProps = {
   cellDelta: { minV: number; maxV: number; deltaV: number } | null;
   connecting: boolean;
   connected: boolean;
+  connectionState: ConnectionState;
 };
 
 export function BmsTabContent({
@@ -47,14 +55,48 @@ export function BmsTabContent({
   cellDelta,
   connecting,
   connected,
+  connectionState,
 }: BmsTabContentProps) {
   const power =
     snapshot?.voltage_V != null && snapshot?.current_A != null
       ? snapshot.voltage_V * snapshot.current_A
       : null;
 
+  const isLoading =
+    connectionState === "connecting" || connectionState === "disconnected";
+
   return (
     <main className="flex flex-col gap-2">
+      {isLoading && (
+        <div className="fixed inset-0 bg-background/50 backdrop-blur-sm z-10 flex flex-col items-center justify-center gap-4 rounded-xl">
+          {connectionState === "connecting" ? (
+            <>
+              <Loader2 className="h-12 w-12 animate-spin text-primary" />
+              <div className="text-center space-y-1">
+                <p className="font-medium text-lg">
+                  Connecting to BMS {bmsId}...
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Establishing real-time connection
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              <WifiOff className="h-12 w-12 text-destructive/70" />
+              <div className="text-center space-y-2">
+                <p className="font-medium text-lg">Not Connected</p>
+                <p className="text-sm text-muted-foreground max-w-xs">
+                  {connectionState === "disconnected"
+                    ? "Connection lost or never established"
+                    : "No connection to BMS"}
+                </p>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Overview Card */}
       <Card>
         <CardHeader className="px-4 py-2 flex items-center justify-between">

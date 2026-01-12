@@ -17,6 +17,7 @@
     "@radix-ui/react-tabs": "^1.1.13",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "framer-motion": "^12.26.1",
     "lucide-react": "^0.545.0",
     "mongoose": "^8.19.1",
     "next": "15.5.4",

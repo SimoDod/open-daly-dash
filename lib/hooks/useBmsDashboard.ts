@@ -83,6 +83,18 @@ export function useBmsDashboard() {
   const evtRef = useRef<EventSource | null>(null);
   const readyStatePollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const getConnectionState = useCallback(
+    (id: BmsId) => {
+      const s = bms[id];
+      if (s.connecting) return "connecting";
+      if (s.status === "connected") return "connected";
+      if (s.status === "ready") return "ready";
+      if (s.status === "degraded") return "degraded";
+      return "disconnected"; // idle, disconnected, etc.
+    },
+    [bms]
+  );
+
   const scheduleFlush = useCallback((id: BmsId) => {
     if (flushTimerRef.current[id]) return;
     flushTimerRef.current[id] = setTimeout(() => {
@@ -442,6 +454,11 @@ export function useBmsDashboard() {
 
     // Per-BMS access
     bms, // { 1: {...}, 2: {...} }
+
+    getConnectionState,
+    isConnecting: (id: BmsId) => bms[id].connecting,
+    isReady: (id: BmsId) => bms[id].status === "ready",
+    isDegraded: (id: BmsId) => bms[id].status === "degraded",
 
     // Convenience helpers
     getBms: (id: BmsId) => bms[id],

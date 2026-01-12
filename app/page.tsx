@@ -18,6 +18,7 @@ export default function Page() {
     setPass,
     connect,
     disconnect,
+    getConnectionState,
     paused,
     togglePause,
     range,
@@ -115,6 +116,7 @@ export default function Page() {
                   cellDelta={cellDeltas[1]}
                   connecting={bms[1].connecting}
                   connected={bms[1].connected}
+                  connectionState={getConnectionState(1)}
                 />
               ) : (
                 <BmsTabContent
@@ -128,6 +130,7 @@ export default function Page() {
                   cellDelta={cellDeltas[2]}
                   connecting={bms[2].connecting}
                   connected={bms[2].connected}
+                  connectionState={getConnectionState(2)}
                 />
               )}
             </motion.div>
