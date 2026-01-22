@@ -29,6 +29,7 @@ export class DalyState {
   dischargeMos?: number | null; // raw byte(s) from 0x93
   charging: boolean = false; // derived
   discharging: boolean = false; // derived
+  _lowSocNotified: boolean = false;
 
   constructor(opts: { ratedAh?: number } = {}) {
     this.ratedAhCfg = Number.isFinite(opts.ratedAh)
@@ -76,7 +77,7 @@ export class DalyState {
 
       if (!this.ratedCapacity_Ah) {
         const pick = DalyState.pickCapacityCandidate(
-          decoded.capacityField_Ah_candidates
+          decoded.capacityField_Ah_candidates,
         );
         if (Number.isFinite(pick))
           this.ratedCapacity_Ah = Number((pick as number).toFixed(2));
@@ -84,7 +85,7 @@ export class DalyState {
 
       if (this.ratedCapacity_Ah && Number.isFinite(this.soc_pct)) {
         this.remainCapacity_Ah = Number(
-          (this.ratedCapacity_Ah * ((this.soc_pct as number) / 100)).toFixed(2)
+          (this.ratedCapacity_Ah * ((this.soc_pct as number) / 100)).toFixed(2),
         );
       }
     }

@@ -28,7 +28,7 @@ const SAMPLE_EVERY_MS = parseInt(process.env.SAMPLE_EVERY_MS || "15000", 10);
 const RX_TIMEOUT_MS = parseInt(process.env.RX_TIMEOUT_MS || "60000", 10); // 60s
 const CONNECT_TIMEOUT_MS = parseInt(
   process.env.CONNECT_TIMEOUT_MS || "60000",
-  10
+  10,
 ); // Increased to 60s
 
 const RATED_AH1 = Number(process.env.RATED_AH1);
@@ -73,10 +73,30 @@ class BmsService extends EventEmitter {
     const parser = new DalyParser(
       () => {},
       (decoded) => {
-        state.update(decoded as any);
+        const ctx = this.getContext(id);
+        const state = ctx.state;
+
+        state.update(decoded as any); // existing update
+
+        // --- Pushcut notification logic ---
+        if (typeof state.soc_pct === "number") {
+          const LOW_SOC = 20;
+          if (state.soc_pct < LOW_SOC && !state._lowSocNotified) {
+            fetch(process.env.PUSH_NOTIFICATION_URL!, { method: "GET" }).catch(
+              () => {},
+            );
+            state._lowSocNotified = true;
+          }
+
+          if (state.soc_pct >= LOW_SOC) {
+            state._lowSocNotified = false;
+          }
+        }
+
+        // -----------------------------------
+
         const snapshot = state.snapshot();
 
-        const ctx = this.getContext(id);
         if (!ctx.ready) {
           ctx.ready = true;
           this.emitEvent(id, { event: "ready" });
@@ -84,7 +104,7 @@ class BmsService extends EventEmitter {
 
         this.emitEvent(id, { event: "decoded", data: decoded });
         this.emitEvent(id, { event: "state", snapshot });
-      }
+      },
     );
 
     return {
@@ -228,7 +248,7 @@ class BmsService extends EventEmitter {
         const conn = await this.withTimeout(
           connectBleUart(addr || undefined, namePart || undefined),
           CONNECT_TIMEOUT_MS,
-          `BLE connect timeout for BMS ${id}`
+          `BLE connect timeout for BMS ${id}`,
         );
         this.emitEvent(id, { event: "connected", device: conn.deviceInfo });
         return conn;
@@ -294,13 +314,16 @@ class BmsService extends EventEmitter {
     await sendPoll();
     ctx.pollTimer = setInterval(sendPoll, POLL_MS);
 
-    ctx.rxWatchTimer = setInterval(() => {
-      const idle = Date.now() - ctx.lastRx;
-      if (idle >= RX_TIMEOUT_MS) {
-        this.emitEvent(ctx.id, { event: "no_data", for_ms: idle });
-        ctx.lastRx = Date.now(); // reset to avoid spam
-      }
-    }, Math.max(1000, Math.floor(RX_TIMEOUT_MS / 3)));
+    ctx.rxWatchTimer = setInterval(
+      () => {
+        const idle = Date.now() - ctx.lastRx;
+        if (idle >= RX_TIMEOUT_MS) {
+          this.emitEvent(ctx.id, { event: "no_data", for_ms: idle });
+          ctx.lastRx = Date.now(); // reset to avoid spam
+        }
+      },
+      Math.max(1000, Math.floor(RX_TIMEOUT_MS / 3)),
+    );
 
     if (Number.isFinite(SAMPLE_EVERY_MS) && SAMPLE_EVERY_MS > 0) {
       const persistOnce = async () => {
@@ -341,7 +364,7 @@ class BmsService extends EventEmitter {
   private async withTimeout<T>(
     p: Promise<T>,
     ms: number,
-    msg: string
+    msg: string,
   ): Promise<T> {
     let to: NodeJS.Timeout;
     return await Promise.race<T>([

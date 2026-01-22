@@ -203,9 +203,11 @@ class BalancingDetector {
 export class DalyParser {
   private buf: Buffer = Buffer.alloc(0);
   private detector = new BalancingDetector();
+  private _lowSocNotified = false;
+  
   constructor(
     private onFrame: (f: Frame) => void,
-    private onDecoded: (d: Decoded) => void
+    private onDecoded: (d: Decoded) => void,
   ) {}
 
   push(chunk: Buffer) {
@@ -305,7 +307,7 @@ function decodeCurrentSmart(iRaw: number) {
   cands.push(c_offset, c_direct, c_signed);
 
   const plausible = cands.filter(
-    (v) => Number.isFinite(v) && Math.abs(v) <= 500
+    (v) => Number.isFinite(v) && Math.abs(v) <= 500,
   );
   if (!plausible.length) return 0;
 
