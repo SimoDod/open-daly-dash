@@ -80,7 +80,7 @@ class BmsService extends EventEmitter {
 
         // --- Pushcut notification logic ---
         if (typeof state.soc_pct === "number") {
-          const LOW_SOC = 30;
+          const LOW_SOC = Number(process.env.SOC_PERCENTAGE_NOTIFICATION_TRIGGER);
           if (state.soc_pct < LOW_SOC && !state._lowSocNotified) {
             fetch(process.env.PUSH_NOTIFICATION_URL!, { method: "GET" }).catch(
               () => {},
