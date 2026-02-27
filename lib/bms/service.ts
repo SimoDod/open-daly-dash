@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // cspell:words Uart
+
 import { EventEmitter } from "events";
 import { connectBleUart } from "./bleUart";
 import type { BleUartConnection } from "./bleUart";
@@ -8,55 +9,134 @@ import { DalyState } from "./state";
 import { getBmsSampleModel } from "../db/mongoose";
 
 export type BmsSnapshot = ReturnType<DalyState["snapshot"]>;
-export type BmsEvent =
-  | { ts: string; event: "hello" }
-  | { ts: string; event: "connecting" }
-  | { ts: string; event: "connected"; device: BleUartConnection["deviceInfo"] }
-  | { ts: string; event: "ready" } // first valid decode received
-  | { ts: string; event: "no_data"; for_ms: number } // link up but silent
-  | { ts: string; event: "disconnected"; reason?: string }
-  | { ts: string; event: "state"; snapshot: BmsSnapshot }
-  | { ts: string; event: "tx"; hex: string }
-  | { ts: string; event: "tx_error"; message: string }
-  | { ts: string; event: "decoded"; data: import("./daly").Decoded };
 
-const POLL_MS = parseInt(process.env.POLL_MS || "6000", 10);
+type BmsEventPayload =
+  | { event: "connecting" }
+  | { event: "connected"; device: BleUartConnection["deviceInfo"] }
+  | { event: "ready" }
+  | { event: "no_data"; for_ms: number }
+  | { event: "disconnected"; reason?: string }
+  | { event: "state"; snapshot: BmsSnapshot }
+  | { event: "tx"; hex: string }
+  | { event: "tx_error"; message: string }
+  | { event: "decoded"; data: import("./daly").Decoded };
+
+export type BmsEvent = BmsEventPayload & { ts: string };
+
+const POLL_MS = parseInt(process.env.POLL_MS || "10000", 10);
+const SAMPLE_EVERY_MS = parseInt(process.env.SAMPLE_EVERY_MS || "15000", 10);
+const RX_TIMEOUT_MS = parseInt(process.env.RX_TIMEOUT_MS || "60000", 10);
+const CONNECT_TIMEOUT_MS = parseInt(
+  process.env.CONNECT_TIMEOUT_MS || "60000",
+  10,
+);
+
 const RATED_AH = Number(process.env.RATED_AH);
 const TARGET_ADDR = (process.env.ADDR || "").toLowerCase();
 const TARGET_NAME = (process.env.NAME || "").toLowerCase();
-const SAMPLE_EVERY_MS = parseInt(process.env.SAMPLE_EVERY_MS || "15000", 10);
 
-// Time without any incoming bytes before we declare "no_data" and drop the link (ms)
-const RX_TIMEOUT_MS = parseInt(process.env.RX_TIMEOUT_MS || "15000", 10);
-// Max time we allow for the initial BLE connect to complete (ms)
-const CONNECT_TIMEOUT_MS = parseInt(
-  process.env.CONNECT_TIMEOUT_MS || "15000",
-  10
-);
+type BmsContext = {
+  connection: BleUartConnection | null;
+  state: DalyState;
+  parser: DalyParser;
+  lastRx: number;
+  pollTimer: NodeJS.Timeout | null;
+  rxWatchTimer: NodeJS.Timeout | null;
+  persistTimer: NodeJS.Timeout | null;
+  ready: boolean;
+};
 
 class BmsService extends EventEmitter {
   private started = false;
-  private lastSnapshot: BmsSnapshot | null = null;
-  private deviceInfo: BleUartConnection["deviceInfo"] | null = null;
-  private pollTimer: NodeJS.Timeout | null = null;
-  private persistTimer: NodeJS.Timeout | null = null;
-  private rxWatchTimer: NodeJS.Timeout | null = null;
   private stopping = false;
+  private ctx: BmsContext;
 
-  private connected = false; // BLE transport connected
-  private ready = false; // data decoded at least once
-
-  getLastSnapshot() {
-    return this.lastSnapshot;
+  constructor() {
+    super();
+    this.ctx = this.createContext();
   }
+
+  private createContext(): BmsContext {
+    const state = new DalyState({
+      ratedAh: Number.isFinite(RATED_AH) ? RATED_AH : undefined,
+    });
+
+    const parser = new DalyParser(
+      () => {},
+      (decoded) => {
+        state.update(decoded as any);
+
+        if (typeof state.soc_pct === "number" && state.soc_pct !== 0) {
+          const LOW_SOC = Number(
+            process.env.SOC_PERCENTAGE_NOTIFICATION_TRIGGER,
+          );
+          if (state.soc_pct < LOW_SOC && !state._lowSocNotified) {
+            fetch(process.env.PUSH_NOTIFICATION_URL!, { method: "GET" }).catch(
+              () => {},
+            );
+            state._lowSocNotified = true;
+          }
+          if (state.soc_pct >= LOW_SOC) {
+            state._lowSocNotified = false;
+          }
+        }
+
+        const snapshot = state.snapshot();
+
+        if (!this.ctx.ready) {
+          this.ctx.ready = true;
+          this.emitEvent({ event: "ready" });
+        }
+
+        this.emitEvent({ event: "decoded", data: decoded });
+        this.emitEvent({ event: "state", snapshot });
+      },
+    );
+
+    return {
+      connection: null,
+      state,
+      parser,
+      lastRx: 0,
+      pollTimer: null,
+      rxWatchTimer: null,
+      persistTimer: null,
+      ready: false,
+    };
+  }
+
+  private emitEvent(payload: BmsEventPayload) {
+    this.emit("evt", {
+      ts: new Date().toISOString(),
+      ...payload,
+    });
+  }
+
+  getLastSnapshot(): BmsSnapshot | null {
+    const snapshot = this.ctx.state.snapshot();
+    return Object.keys(snapshot).length > 0 ? snapshot : null;
+  }
+
   getDeviceInfo() {
-    return this.deviceInfo;
+    return this.ctx.connection?.deviceInfo ?? null;
   }
+
   getIsConnected() {
-    return this.connected;
+    return this.ctx.connection !== null;
   }
+
   getIsReady() {
-    return this.ready;
+    return this.ctx.ready;
+  }
+
+  getStatus() {
+    return {
+      ts: new Date().toISOString(),
+      connected: this.getIsConnected(),
+      ready: this.getIsReady(),
+      device: this.getDeviceInfo(),
+      snapshot: this.getLastSnapshot(),
+    };
   }
 
   async ensureStarted() {
@@ -69,186 +149,154 @@ class BmsService extends EventEmitter {
     let backoffMs = 1000;
 
     while (!this.stopping) {
-      // Announce connecting
-      this.emit("evt", <BmsEvent>{
-        ts: new Date().toISOString(),
-        event: "connecting",
-      });
+      this.emitEvent({ event: "connecting" });
 
-      let ctx: Awaited<ReturnType<typeof connectBleUart>> | null = null;
-      this.connected = false;
-      this.ready = false;
-      this.deviceInfo = null;
-
-      try {
-        // Only pass filters if present (avoid empty string surprises)
-        const addr = TARGET_ADDR || undefined;
-        const namePart = TARGET_NAME || undefined;
-
-        ctx = await this.withTimeout(
-          connectBleUart({ addr, namePart }),
-          CONNECT_TIMEOUT_MS,
-          "BLE connect timeout"
-        );
-
-        this.deviceInfo = ctx.deviceInfo;
-        this.connected = true;
-        this.emit("evt", <BmsEvent>{
-          ts: new Date().toISOString(),
-          event: "connected",
-          device: this.deviceInfo,
-        });
-
-        const state = new DalyState({
-          ratedAh: Number.isFinite(RATED_AH) ? RATED_AH : undefined,
-        });
-
-        const parser = new DalyParser(
-          () => {},
-          (d) => {
-            // update state with any decoded frame including status_0x93 and balance_flags
-            state.update(d as any);
-            this.lastSnapshot = state.snapshot();
-
-            if (!this.ready) {
-              this.ready = true;
-              this.emit("evt", <BmsEvent>{
-                ts: new Date().toISOString(),
-                event: "ready",
-              });
-            }
-
-            this.emit("evt", <BmsEvent>{
-              ts: new Date().toISOString(),
-              event: "decoded",
-              data: d,
-            });
-            this.emit("evt", <BmsEvent>{
-              ts: new Date().toISOString(),
-              event: "state",
-              snapshot: this.lastSnapshot!,
-            });
-          }
-        );
-
-        // Track last RX time for watchdog
-        let lastRx = Date.now();
-
-        ctx.onData((buf) => {
-          lastRx = Date.now();
-          parser.push(buf);
-        });
-
-        const frames = defaultPollSet();
-
-        const sendPoll = async () => {
-          for (const frame of frames) {
-            try {
-              await ctx!.write(frame);
-              this.emit("evt", <BmsEvent>{
-                ts: new Date().toISOString(),
-                event: "tx",
-                hex: frame.toString("hex"),
-              });
-              await new Promise((r) => setTimeout(r, 120));
-            } catch (e) {
-              this.emit("evt", <BmsEvent>{
-                ts: new Date().toISOString(),
-                event: "tx_error",
-                message: e instanceof Error ? e.message : String(e),
-              });
-            }
-          }
-        };
-
-        await sendPoll();
-        this.pollTimer = setInterval(sendPoll, POLL_MS);
-
-        // Persistence loop (Mongoose)
-        if (Number.isFinite(SAMPLE_EVERY_MS) && SAMPLE_EVERY_MS > 0) {
-          const persistOnce = async () => {
-            try {
-              if (this.lastSnapshot) {
-                const Model = await getBmsSampleModel();
-                await Model.create({
-                  ts: new Date(),
-                  snapshot: this.lastSnapshot,
-                });
-              }
-            } catch {
-              // ignore persistence errors, keep running
-            }
-          };
-          await persistOnce();
-          this.persistTimer = setInterval(persistOnce, SAMPLE_EVERY_MS);
-        }
-
-        // RX watchdog: if we don't see any bytes for RX_TIMEOUT_MS, declare no_data and drop link
-        this.rxWatchTimer = setInterval(async () => {
-          const idle = Date.now() - lastRx;
-          if (idle >= RX_TIMEOUT_MS) {
-            this.emit("evt", <BmsEvent>{
-              ts: new Date().toISOString(),
-              event: "no_data",
-              for_ms: idle,
-            });
-            try {
-              await ctx!.disconnect();
-            } catch {}
-          }
-        }, Math.max(1000, Math.min(5000, Math.floor(RX_TIMEOUT_MS / 3))));
-
-        ctx.onDisconnect(() => {
-          this.cleanupTimers();
-          if (this.stopping) return;
-          this.connected = false;
-          this.ready = false;
-          this.emit("evt", <BmsEvent>{
-            ts: new Date().toISOString(),
-            event: "disconnected",
-            reason: "BLE device disconnected",
-          });
-        });
-
-        // Reset backoff after a successful connect
+      const conn = await this.connect();
+      if (conn) {
+        await this.setupContext(conn);
         backoffMs = 1000;
 
-        // Wait here until we are disconnected (loop continues after onDisconnect)
         await new Promise<void>((resolve) => {
-          const onDisc = () => resolve();
-          ctx!.onDisconnect(onDisc);
-        });
-      } catch (e) {
-        // Initial connect failed
-        this.cleanupTimers();
-        this.connected = false;
-        this.ready = false;
-        this.emit("evt", <BmsEvent>{
-          ts: new Date().toISOString(),
-          event: "disconnected",
-          reason: e instanceof Error ? e.message : String(e),
+          const handler = (evt: BmsEvent) => {
+            if (evt.event === "disconnected") {
+              this.off("evt", handler);
+              resolve();
+            }
+          };
+          this.on("evt", handler);
         });
       }
 
       if (this.stopping) break;
 
-      // Backoff before retry
       await new Promise((r) => setTimeout(r, backoffMs));
       backoffMs = Math.min(backoffMs * 2, 30000);
     }
   }
 
-  private cleanupTimers() {
-    if (this.pollTimer) clearInterval(this.pollTimer);
-    if (this.persistTimer) clearInterval(this.persistTimer);
-    if (this.rxWatchTimer) clearInterval(this.rxWatchTimer);
-    this.pollTimer = this.persistTimer = this.rxWatchTimer = null;
+  private async connect(): Promise<BleUartConnection | null> {
+    if (!TARGET_ADDR && !TARGET_NAME) {
+      this.emitEvent({
+        event: "disconnected",
+        reason: "No ADDR or NAME configured",
+      });
+      return null;
+    }
+
+    let retryDelay = 2000;
+
+    while (!this.stopping) {
+      try {
+        const conn = await this.withTimeout(
+          connectBleUart(TARGET_ADDR || undefined, TARGET_NAME || undefined),
+          CONNECT_TIMEOUT_MS,
+          "BLE connect timeout",
+        );
+        this.emitEvent({ event: "connected", device: conn.deviceInfo });
+        return conn;
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        if (message.includes("BLE connect timeout")) {
+          await new Promise((r) => setTimeout(r, retryDelay));
+          retryDelay = Math.min(retryDelay * 1.5, 15000);
+          continue;
+        }
+
+        this.emitEvent({ event: "disconnected", reason: message });
+        return null;
+      }
+    }
+    return null;
+  }
+
+  private async setupContext(conn: BleUartConnection) {
+    const ctx = this.ctx;
+
+    ctx.connection = conn;
+    ctx.lastRx = Date.now();
+
+    conn.onData((buf) => {
+      ctx.lastRx = Date.now();
+      ctx.parser.push(buf);
+    });
+
+    conn.onDisconnect(() => {
+      this.emitEvent({
+        event: "disconnected",
+        reason: "Connection lost",
+      });
+      this.cleanupContext();
+    });
+
+    const frames = defaultPollSet();
+    const sendPoll = async () => {
+      for (const frame of frames) {
+        try {
+          await conn.write(frame);
+          this.emitEvent({ event: "tx", hex: frame.toString("hex") });
+          await new Promise((r) => setTimeout(r, 300));
+        } catch (e) {
+          this.emitEvent({
+            event: "tx_error",
+            message: e instanceof Error ? e.message : String(e),
+          });
+        }
+      }
+    };
+
+    await sendPoll();
+    ctx.pollTimer = setInterval(sendPoll, POLL_MS);
+
+    ctx.rxWatchTimer = setInterval(
+      () => {
+        const idle = Date.now() - ctx.lastRx;
+        if (idle >= RX_TIMEOUT_MS) {
+          this.emitEvent({ event: "no_data", for_ms: idle });
+          ctx.lastRx = Date.now();
+        }
+      },
+      Math.max(1000, Math.floor(RX_TIMEOUT_MS / 3)),
+    );
+
+    if (Number.isFinite(SAMPLE_EVERY_MS) && SAMPLE_EVERY_MS > 0) {
+      const persistOnce = async () => {
+        try {
+          const snapshot = ctx.state.snapshot();
+          if (snapshot && Object.keys(snapshot).length > 0) {
+            const Model = await getBmsSampleModel();
+            await Model.create({
+              ts: new Date(),
+              snapshot,
+            });
+          }
+        } catch {}
+      };
+
+      await persistOnce();
+      ctx.persistTimer = setInterval(persistOnce, SAMPLE_EVERY_MS);
+    }
+  }
+
+  private cleanupContext() {
+    const ctx = this.ctx;
+
+    if (ctx.pollTimer) clearInterval(ctx.pollTimer);
+    if (ctx.rxWatchTimer) clearInterval(ctx.rxWatchTimer);
+    if (ctx.persistTimer) clearInterval(ctx.persistTimer);
+
+    ctx.pollTimer = ctx.rxWatchTimer = ctx.persistTimer = null;
+
+    if (ctx.connection) {
+      ctx.connection.disconnect().catch(() => {});
+      ctx.connection = null;
+      ctx.ready = false;
+    }
   }
 
   private async withTimeout<T>(
     p: Promise<T>,
     ms: number,
-    msg: string
+    msg: string,
   ): Promise<T> {
     let to: NodeJS.Timeout;
     return await Promise.race<T>([
@@ -257,6 +305,11 @@ class BmsService extends EventEmitter {
         to = setTimeout(() => rej(new Error(msg)), ms);
       }),
     ]);
+  }
+
+  stop() {
+    this.stopping = true;
+    this.cleanupContext();
   }
 }
 
