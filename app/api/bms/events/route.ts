@@ -35,9 +35,6 @@ export async function GET(req: NextRequest) {
         controller.enqueue(`data: ${JSON.stringify(obj)}\n\n`);
       };
 
-      // initial hello
-      write({ ts: new Date().toISOString(), event: "hello" });
-
       // seed current status
       const isConnected = (svc as any).getIsConnected?.() ?? false;
       const isReady = (svc as any).getIsReady?.() ?? false;
@@ -81,7 +78,7 @@ export async function GET(req: NextRequest) {
       // keepalive pings (some proxies need no-transform to avoid buffering)
       const ping = setInterval(
         () => controller.enqueue(`: keepalive\n\n`),
-        15000
+        15000,
       );
 
       // subscribe
