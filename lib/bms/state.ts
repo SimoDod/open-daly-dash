@@ -1,4 +1,4 @@
-// state.ts - DalyState with status_0x93, balance_flags, and MOS fields
+// state.ts - DalyState with status_0x93, balance_flags, MOS fields, and Pushcut low-SOC notification
 
 type CapacityCandidates = { by0p01?: number; by0p1?: number };
 
@@ -6,7 +6,7 @@ export class DalyState {
   ratedAhCfg?: number;
   cellCount?: number;
   voltage_V?: number;
-  current_A?: number; // direct from BMS (0x90)
+  current_A?: number;
   currentSource: "direct" | "none" = "none";
   soc_pct?: number;
   ratedCapacity_Ah?: number;
@@ -24,11 +24,12 @@ export class DalyState {
   balancingActive: boolean = false;
   balancingCells: number[] = [];
 
-  // MOS / charge-discharge
-  chargeMos?: number | null; // raw byte(s) from 0x93
-  dischargeMos?: number | null; // raw byte(s) from 0x93
-  charging: boolean = false; // derived
-  discharging: boolean = false; // derived
+  chargeMos?: number | null;
+  dischargeMos?: number | null;
+  charging: boolean = false;
+  discharging: boolean = false;
+
+  _lowSocNotified: boolean = false;
 
   constructor(opts: { ratedAh?: number } = {}) {
     this.ratedAhCfg = Number.isFinite(opts.ratedAh)
@@ -38,12 +39,15 @@ export class DalyState {
   }
 
   static pickCapacityCandidate(cand?: CapacityCandidates) {
-    const c1 = cand?.by0p01,
-      c2 = cand?.by0p1;
+    const c1 = cand?.by0p01;
+    const c2 = cand?.by0p1;
+
     const ok = (v?: number) =>
       Number.isFinite(v) && (v as number) >= 5 && (v as number) <= 1000;
+
     const pos = [c1, c2].filter(ok) as number[];
     if (!pos.length) return undefined;
+
     let best = pos[0];
     for (const v of pos) {
       const fBest = Math.abs(Math.round(best) - best);
@@ -51,6 +55,27 @@ export class DalyState {
       if (f < fBest) best = v;
     }
     return best;
+  }
+
+  private handleLowSocNotification() {
+    if (!Number.isFinite(this.soc_pct)) return;
+
+    const LOW_SOC = Number(process.env.SOC_PERCENTAGE_NOTIFICATION_TRIGGER);
+    if (!Number.isFinite(LOW_SOC)) return;
+
+    const soc = this.soc_pct as number;
+
+    if (soc < LOW_SOC && !this._lowSocNotified) {
+      const url = process.env.PUSH_NOTIFICATION_URL;
+      if (url) {
+        fetch(url, { method: "GET" }).catch(() => {});
+      }
+      this._lowSocNotified = true;
+    }
+
+    if (soc >= LOW_SOC) {
+      this._lowSocNotified = false;
+    }
   }
 
   update(decoded: import("./daly").Decoded) {
@@ -71,20 +96,23 @@ export class DalyState {
         this.currentSource = "none";
       }
 
-      if (Number.isFinite(decoded.soc_pct))
+      if (Number.isFinite(decoded.soc_pct)) {
         this.soc_pct = Math.max(0, Math.min(100, decoded.soc_pct ?? 0));
+        this.handleLowSocNotification();
+      }
 
       if (!this.ratedCapacity_Ah) {
         const pick = DalyState.pickCapacityCandidate(
-          decoded.capacityField_Ah_candidates
+          decoded.capacityField_Ah_candidates,
         );
-        if (Number.isFinite(pick))
+        if (Number.isFinite(pick)) {
           this.ratedCapacity_Ah = Number((pick as number).toFixed(2));
+        }
       }
 
       if (this.ratedCapacity_Ah && Number.isFinite(this.soc_pct)) {
         this.remainCapacity_Ah = Number(
-          (this.ratedCapacity_Ah * ((this.soc_pct as number) / 100)).toFixed(2)
+          (this.ratedCapacity_Ah * ((this.soc_pct as number) / 100)).toFixed(2),
         );
       }
     }
@@ -98,40 +126,48 @@ export class DalyState {
       this.cellDelta_V = decoded.delta_V;
     }
 
-    if (decoded.type === "temps" && Array.isArray(decoded.temps_C))
+    if (decoded.type === "temps" && Array.isArray(decoded.temps_C)) {
       this.temps_C = decoded.temps_C;
+    }
 
     if (decoded.type === "cells") {
       if (typeof decoded.page === "number" && Array.isArray(decoded.cells_mV)) {
         this.cellPages.set(decoded.page, decoded.cells_mV.slice());
       }
+
       const pages = [...this.cellPages.keys()].sort((a, b) => a - b);
       const flat: number[] = [];
-      for (const p of pages)
-        for (const mv of this.cellPages.get(p) || []) flat.push(mv);
+
+      for (const p of pages) {
+        for (const mv of this.cellPages.get(p) || []) {
+          flat.push(mv);
+        }
+      }
+
       this.cells_mV =
         typeof this.cellCount === "number"
           ? flat.slice(0, this.cellCount)
           : flat;
 
       if (this.cells_mV.length) {
-        const min = Math.min(...this.cells_mV),
-          max = Math.max(...this.cells_mV);
+        const min = Math.min(...this.cells_mV);
+        const max = Math.max(...this.cells_mV);
+
         this.cellMin_mV = min;
         this.cellMax_mV = max;
         this.cellDelta_mV = max - min;
+
         this.cellMin_V = Number((min / 1000).toFixed(3));
         this.cellMax_V = Number((max / 1000).toFixed(3));
         this.cellDelta_V = Number(((max - min) / 1000).toFixed(3));
       }
     }
 
-    // status_0x93 handler (cycles + remaining mAh + MOS bytes)
     if (decoded.type === "status_0x93") {
-      // store raw MOS bytes
       this.chargeMos = Number.isFinite(decoded.chargeMos as number)
         ? (decoded.chargeMos as number)
         : null;
+
       this.dischargeMos = Number.isFinite(decoded.dischargeMos as number)
         ? (decoded.dischargeMos as number)
         : null;
@@ -141,9 +177,9 @@ export class DalyState {
         !!this.dischargeMos && (this.dischargeMos as number) !== 0;
     }
 
-    // balance_flags handler (from detector or device)
     if (decoded.type === "balance_flags") {
       const activeCells: number[] = [];
+
       if (Array.isArray(decoded.perCell) && decoded.perCell.length) {
         for (let i = 0; i < decoded.perCell.length; i++) {
           if (decoded.perCell[i]) activeCells.push(i);
@@ -153,6 +189,7 @@ export class DalyState {
           if (decoded.mask & (1 << i)) activeCells.push(i);
         }
       }
+
       this.balancingActive = activeCells.length > 0;
       this.balancingCells = activeCells;
     }
@@ -161,11 +198,15 @@ export class DalyState {
   snapshot() {
     const cells_mV = this.cells_mV;
     const cells_V = cells_mV.map((v) => Number((v / 1000).toFixed(3)));
+
     const packFromCells_V = cells_V.length
       ? Number(cells_V.reduce((a, b) => a + b, 0).toFixed(2))
       : undefined;
+
     let soc = this.soc_pct;
-    if (Number.isFinite(soc)) soc = Number((soc as number).toFixed(1));
+    if (Number.isFinite(soc)) {
+      soc = Number((soc as number).toFixed(1));
+    }
 
     return {
       voltage_V: this.voltage_V,

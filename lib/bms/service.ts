@@ -32,8 +32,8 @@ const CONNECT_TIMEOUT_MS = parseInt(
 );
 
 const RATED_AH = Number(process.env.RATED_AH);
-const TARGET_ADDR = (process.env.ADDR || "").toLowerCase();
-const TARGET_NAME = (process.env.NAME || "").toLowerCase();
+const TARGET_ADDR = (process.env.ADDR1 || "").toLowerCase();
+const TARGET_NAME = (process.env.NAME1 || "").toLowerCase();
 
 type BmsContext = {
   connection: BleUartConnection | null;
@@ -188,7 +188,10 @@ class BmsService extends EventEmitter {
     while (!this.stopping) {
       try {
         const conn = await this.withTimeout(
-          connectBleUart(TARGET_ADDR || undefined, TARGET_NAME || undefined),
+          connectBleUart({
+            addr: TARGET_ADDR || undefined,
+            namePart: TARGET_NAME || undefined,
+          }),
           CONNECT_TIMEOUT_MS,
           "BLE connect timeout",
         );
