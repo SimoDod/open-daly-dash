@@ -66,7 +66,9 @@ class BmsService extends EventEmitter {
       (decoded) => {
         state.update(decoded as any);
 
-        if (typeof state.soc_pct === "number" && state.soc_pct !== 0) {
+        // Only notify if SOC is between 1% and the threshold (avoid stale 0% data)
+        const MIN_SOC_FOR_NOTIFICATION = 1;
+        if (typeof state.soc_pct === "number" && state.soc_pct >= MIN_SOC_FOR_NOTIFICATION) {
           const LOW_SOC = Number(
             process.env.SOC_PERCENTAGE_NOTIFICATION_TRIGGER,
           );

@@ -58,7 +58,11 @@ export class DalyState {
   }
 
   private handleLowSocNotification() {
-    if (!Number.isFinite(this.soc_pct)) return;
+    if (typeof this.soc_pct !== "number") return;
+
+    // Only notify if SOC is between 1% and the threshold (avoid stale 0% data)
+    const MIN_SOC_FOR_NOTIFICATION = 1;
+    if (this.soc_pct < MIN_SOC_FOR_NOTIFICATION) return;
 
     const LOW_SOC = Number(process.env.SOC_PERCENTAGE_NOTIFICATION_TRIGGER);
     if (!Number.isFinite(LOW_SOC)) return;
