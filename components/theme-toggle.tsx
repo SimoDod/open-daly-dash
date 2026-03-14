@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { Moon, Sun, Monitor } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export function ThemeToggle({ className }: { className?: string }) {
@@ -33,14 +34,16 @@ export function ThemeToggle({ className }: { className?: string }) {
   };
 
   return (
-    <button
+    <Button
       type="button"
-      className={cn("btn btn-outline p-2", className)}
+      variant="outline"
+      size="icon-sm"
+      className={cn("shrink-0 rounded-full", className)}
       aria-label={`theme:${current}`}
       title={undefined}
       onClick={handle}
     >
       {renderIcon()}
-    </button>
+    </Button>
   );
 }

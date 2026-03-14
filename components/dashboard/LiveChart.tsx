@@ -24,7 +24,6 @@ const CartesianGrid = dynamic(
   () => import("recharts").then((m) => m.CartesianGrid),
   { ssr: false }
 );
-import { Legend } from "recharts";
 const ResponsiveContainer = dynamic(
   () => import("recharts").then((m) => m.ResponsiveContainer),
   { ssr: false }
@@ -60,10 +59,10 @@ const LiveChartComponent = ({
     : [-50, 50]; // Adjust based on expected ranges
 
   return (
-    <div className="w-full" aria-label="Live Battery Metrics Chart">
+    <div className="min-w-0 w-full overflow-hidden" aria-label="Live Battery Metrics Chart">
       <div className="h-64 sm:h-72 md:h-80 ">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data}>
+          <LineChart data={data} margin={{ top: 8, right: 8, bottom: 8, left: 0 }}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
               dataKey="ts"
@@ -106,7 +105,6 @@ const LiveChartComponent = ({
               tickFormatter={(v: number) => `${v}%`}
             />
             <Tooltip />
-            <Legend layout="horizontal" verticalAlign="top" align="center" />
 
             {showV && (
               <Line
