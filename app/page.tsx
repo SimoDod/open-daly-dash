@@ -186,6 +186,7 @@ export default function Page() {
     setPass,
     connected,
     connecting,
+    status,
     lastError,
     connect,
     disconnect,
@@ -240,6 +241,44 @@ export default function Page() {
       : lastError
         ? "rose"
         : "slate";
+
+  const connectionStatusTone: Tone =
+    status === "ready" || status === "connected"
+      ? "emerald"
+      : status === "connecting" || status === "degraded"
+        ? "amber"
+        : status === "disconnected"
+          ? "rose"
+          : "slate";
+
+  const connectionStatusLabel =
+    status === "ready"
+      ? "Ready"
+      : status === "connected"
+        ? "Connected"
+        : status === "connecting"
+          ? "Connecting"
+          : status === "degraded"
+            ? "Degraded"
+            : status === "disconnected"
+              ? "Disconnected"
+              : "Idle";
+
+  const connectionHealthTone: Tone = lastError
+    ? "rose"
+    : connected
+      ? "emerald"
+      : connecting
+        ? "amber"
+        : "slate";
+
+  const connectionHealthLabel = lastError
+    ? lastError
+    : connected
+      ? "Stable"
+      : connecting
+        ? "Negotiating stream"
+        : "Waiting for stream";
 
   const healthTone: Tone =
     cellDelta?.deltaV == null
@@ -301,6 +340,9 @@ export default function Page() {
             <CardContent className="px-4 py-4 sm:px-5 sm:py-5">
               <div className="space-y-4">
                 <div className="flex flex-wrap items-center gap-2">
+                  <StatusBadge tone={connectionHealthTone}>
+                    Health Status: {connectionHealthLabel}
+                  </StatusBadge>
                   <StatusBadge tone={healthTone}>
                     Cell delta{" "}
                     {cellDelta
@@ -594,6 +636,12 @@ export default function Page() {
               </div>
 
               <div className="flex flex-wrap gap-2">
+                <StatusBadge tone={connectionStatusTone}>
+                  Connection {connectionStatusLabel}
+                </StatusBadge>
+                <StatusBadge tone={connectionHealthTone}>
+                  Health {connectionHealthLabel}
+                </StatusBadge>
                 <StatusBadge tone={healthTone}>
                   Delta{" "}
                   {cellDelta
