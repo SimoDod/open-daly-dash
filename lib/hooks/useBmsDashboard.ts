@@ -202,7 +202,6 @@ export function useBmsDashboard() {
       setConnected(false);
       if (isOnline) {
         setStatus("connecting");
-        setLastError("Event stream error");
       } else {
         setStatus("disconnected");
         setLastError("Offline");

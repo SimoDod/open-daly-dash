@@ -65,9 +65,11 @@ const toneText: Record<Tone, string> = {
 
 function StatusBadge({
   tone,
+  spinning,
   children,
 }: {
   tone: Tone;
+  spinning?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -77,7 +79,11 @@ function StatusBadge({
         toneText[tone],
       )}
     >
-      <span className={cn("size-1.5 rounded-full", toneDot[tone])} />
+      {spinning ? (
+        <Loader2 className="size-3 animate-spin text-amber-500" />
+      ) : (
+        <span className={cn("size-1.5 rounded-full", toneDot[tone])} />
+      )}
       {children}
     </span>
   );
@@ -267,20 +273,20 @@ export default function Page() {
               ? "Disconnected"
               : "Idle";
 
-  const connectionHealthTone: Tone = lastError
-    ? "rose"
+  const connectionHealthTone: Tone = connecting
+    ? "amber"
     : connected
       ? "emerald"
-      : connecting
-        ? "amber"
+      : lastError
+        ? "rose"
         : "slate";
 
-  const connectionHealthLabel = lastError
-    ? lastError
+  const connectionHealthLabel = connecting
+    ? "Connecting"
     : connected
       ? "Stable"
-      : connecting
-        ? "Negotiating stream"
+      : lastError
+        ? lastError
         : "Waiting for stream";
 
   const healthTone: Tone =
@@ -329,7 +335,7 @@ export default function Page() {
       <main className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-6 sm:px-6">
         {/* Status bar */}
         <div className="flex flex-wrap items-center gap-2">
-          <StatusBadge tone={connectionHealthTone}>
+          <StatusBadge tone={connectionHealthTone} spinning={connecting}>
             {connectionHealthLabel}
           </StatusBadge>
           <StatusBadge tone={healthTone}>
@@ -608,7 +614,7 @@ export default function Page() {
               </div>
 
               <div className="flex flex-wrap gap-1.5">
-                <StatusBadge tone={connectionStatusTone}>
+                <StatusBadge tone={connectionStatusTone} spinning={connecting}>
                   {connectionStatusLabel}
                 </StatusBadge>
                 <StatusBadge tone={healthTone}>
