@@ -22,11 +22,11 @@ const Tooltip = dynamic(() => import("recharts").then((m) => m.Tooltip), {
 });
 const CartesianGrid = dynamic(
   () => import("recharts").then((m) => m.CartesianGrid),
-  { ssr: false }
+  { ssr: false },
 );
 const ResponsiveContainer = dynamic(
   () => import("recharts").then((m) => m.ResponsiveContainer),
-  { ssr: false }
+  { ssr: false },
 );
 
 const LiveChartComponent = ({
@@ -42,7 +42,7 @@ const LiveChartComponent = ({
 }) => {
   if (!data || data.length === 0) {
     return (
-      <div className="h-64 sm:h-72 md:h-80 flex items-center justify-center text-gray-500">
+      <div className="h-64 sm:h-72 md:h-80 flex items-center justify-center text-muted-foreground text-sm">
         No data available
       </div>
     );
@@ -59,10 +59,16 @@ const LiveChartComponent = ({
     : [-50, 50]; // Adjust based on expected ranges
 
   return (
-    <div className="min-w-0 w-full overflow-hidden" aria-label="Live Battery Metrics Chart">
-      <div className="h-64 sm:h-72 md:h-80 ">
+    <div
+      className="min-w-0 w-full overflow-hidden"
+      aria-label="Live Battery Metrics Chart"
+    >
+      <div className="h-64 sm:h-72 md:h-80">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 8, right: 8, bottom: 8, left: 0 }}>
+          <LineChart
+            data={data}
+            margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
+          >
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
               dataKey="ts"

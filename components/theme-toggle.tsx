@@ -14,7 +14,7 @@ export function ThemeToggle({ className }: { className?: string }) {
     setMounted(true);
   }, []);
 
-  const current = mounted ? theme ?? "system" : "system";
+  const current = mounted ? (theme ?? "system") : "system";
 
   const next = (t: string) => {
     if (t === "light") return "dark";
@@ -36,9 +36,9 @@ export function ThemeToggle({ className }: { className?: string }) {
   return (
     <Button
       type="button"
-      variant="outline"
+      variant="ghost"
       size="icon-sm"
-      className={cn("shrink-0 rounded-full", className)}
+      className={cn("shrink-0 rounded-lg", className)}
       aria-label={`theme:${current}`}
       title={undefined}
       onClick={handle}

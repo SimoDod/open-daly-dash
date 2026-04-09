@@ -22,10 +22,10 @@ export default function BatteryReal({
   const level = pct == null ? 0 : pct;
 
   const getColorClass = (p: number | null) => {
-    if (p == null) return "bg-gray-400";
-    if (p > 60) return "bg-green-500/60";
-    if (p > 30) return "bg-amber-500/60";
-    return "bg-red-500/50";
+    if (p == null) return "bg-muted-foreground/30";
+    if (p > 60) return "bg-emerald-500";
+    if (p > 30) return "bg-amber-500";
+    return "bg-rose-500";
   };
 
   const fillColor = getColorClass(pct);
@@ -44,11 +44,11 @@ export default function BatteryReal({
       role="img"
       aria-label={ariaLabel}
       style={{ width: size, height }}
-      className={`relative flex items-center my-4 ${className}`}
+      className={`relative flex items-center my-3 ${className}`}
     >
       {/* Battery body */}
       <div
-        className={`relative flex-1 h-full rounded-[4px] border border-muted-foreground/30 bg-muted/10 overflow-hidden`}
+        className={`relative flex-1 h-full rounded-[5px] border border-border bg-secondary overflow-hidden`}
         style={{ marginRight: capWidth }}
       >
         {/* Background track */}
@@ -76,7 +76,7 @@ export default function BatteryReal({
       <div
         aria-hidden
         style={{ width: capWidth, height: Math.round(height * 0.62) }}
-        className="rounded-sm border border-muted-foreground/30 bg-muted/10"
+        className="rounded-sm border border-border bg-secondary"
       />
     </div>
   );

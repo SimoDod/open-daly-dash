@@ -15,10 +15,10 @@ export function RangeSelector({
       key={key}
       onClick={() => onChange(key)}
       className={cn(
-        "rounded-xl px-3 py-2 text-sm font-medium transition-colors",
+        "rounded-md px-3 py-1.5 text-xs font-medium transition-all",
         value === key
           ? "bg-primary text-primary-foreground shadow-sm"
-          : "text-muted-foreground hover:bg-accent/70 hover:text-foreground"
+          : "text-muted-foreground hover:bg-secondary hover:text-foreground",
       )}
       aria-pressed={value === key}
     >
@@ -27,7 +27,7 @@ export function RangeSelector({
   );
 
   return (
-    <div className="grid grid-cols-2 gap-1 rounded-[1rem] bg-background/80 p-1 sm:flex sm:flex-wrap dark:bg-background/50">
+    <div className="inline-flex gap-0.5 rounded-lg bg-secondary p-0.5">
       {btn("1h", "1h")}
       {btn("6h", "6h")}
       {btn("24h", "24h")}
