@@ -49,7 +49,7 @@ export function useBmsDashboard() {
   const [showSoc, setShowSoc] = useState(true);
 
   const [isOnline, setIsOnline] = useState(
-    typeof navigator !== "undefined" ? navigator.onLine : true
+    typeof navigator !== "undefined" ? navigator.onLine : true,
   );
 
   const pausedRef = useRef(false);
@@ -91,7 +91,7 @@ export function useBmsDashboard() {
     }
 
     const es = new EventSource(
-      `/api/bms/events?pass=${encodeURIComponent(pass)}`
+      `/api/bms/events?pass=${encodeURIComponent(pass)}`,
     );
     evtRef.current = es;
 
@@ -244,7 +244,7 @@ export function useBmsDashboard() {
           from = new Date(now.getTime() - 24 * 3600e3);
       }
       const url = `/api/bms/history?from=${encodeURIComponent(
-        from.toISOString()
+        from.toISOString(),
       )}&to=${encodeURIComponent(now.toISOString())}`;
       try {
         const res = await fetch(url, {
@@ -264,7 +264,7 @@ export function useBmsDashboard() {
         setChartData(pts.slice(-MAX_POINTS));
       } catch {}
     },
-    [pass]
+    [pass],
   );
 
   useEffect(() => {
